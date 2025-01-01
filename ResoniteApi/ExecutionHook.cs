@@ -23,7 +23,6 @@ internal static class ExecutionHook
 
     static ExecutionHook()
     {
-        UniLog.Log("[ResoniteApi] ExecutionHook start");
         try
         {
             UniLog.Log("[ResoniteApi] Registering post-initialization step");
@@ -36,13 +35,10 @@ internal static class ExecutionHook
         {
             UniLog.Error($"[ResoniteApi] Exception in ExecutionHook!\n{e}");
         }
-
-        UniLog.Log("[ResoniteApi] ExecutionHook end");
     }
 
     async private static Task UserspaceInit()
     {
-        UniLog.Log("[ResoniteApi] UserspaceInit start");
         try
         {
             UniLog.Log("[ResoniteApi] Waiting for userspace world...");
@@ -55,8 +51,6 @@ internal static class ExecutionHook
         {
             UniLog.Error($"[ResoniteApi] Exception in UserspaceInit!\n{e}");
         }
-
-        UniLog.Log("[ResoniteApi] UserspaceInit end");
     }
 
     async private static Task<World> GetUserspaceWorld()

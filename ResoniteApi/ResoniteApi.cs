@@ -1,6 +1,15 @@
-﻿using FrooxEngine;
+﻿using Newtonsoft.Json;
 using System;
 using System.Net;
+
+using FrooxEngine;
+using SkyFrost;
+using System.CodeDom;
+using SkyFrost.Base;
+using System.Linq;
+using System.Collections.Generic;
+using System.Runtime.Remoting.Contexts;
+using Elements.Core;
 
 namespace ResoniteApi
 {
@@ -10,12 +19,14 @@ namespace ResoniteApi
         public readonly Sync<bool> IsRunning;
         public readonly Sync<int> Port;
         private ApiServer _apiServer;
+        private int _currentPort;
 
         public override bool UserspaceOnly => true;
 
         public ResoniteApi() : base()
         {
             _apiServer = new ApiServer();
+            _currentPort = 0;
         }
 
         protected override void OnStart()
@@ -25,13 +36,42 @@ namespace ResoniteApi
             IsRunning.Value = false;
             Port.Value = GetDefaultPort();
 
-            ApiServer.RegisterHandler(new ApiEndpoint("GET", "/ping"), async (HttpListenerContext context) =>
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "ping"), async (HttpListenerContext context, string[] arguments) =>
             {
-                return new ApiResponse(200, "pong");
+                string response = "pong";
+
+                return new ApiResponse(200, JsonConvert.SerializeObject(response));
+            });
+
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "version"), async (HttpListenerContext context, string[] arguments) =>
+            {
+                string version = Engine.VersionString;
+
+                return new ApiResponse(200, JsonConvert.SerializeObject(version));
+            });
+
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts"), async (HttpListenerContext context, string[] arguments) =>
+            {
+                Utils.ThrowIfClientIsResonite(context.Request); // Don't allow from within Resonite
+
+                ContactResourceEnumerable contacts = new((await Cloud.Contacts.GetContacts()).Entity);
+
+                return new ApiResponse(200, JsonConvert.SerializeObject(contacts.GetJsonRepresentation()));
+            });
+
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts/{contactUserId}"), async (HttpListenerContext context, string[] arguments) =>
+            {
+                Utils.ThrowIfClientIsResonite(context.Request); // Don't allow from within Resonite
+
+                string contactUserId = arguments[0];
+                ContactResource contact = new(Cloud.Contacts.GetContact(contactUserId));
+
+                return new ApiResponse(200, JsonConvert.SerializeObject(contact.GetJsonRepresentation()));
             });
 
             if (Port.Value > 0)
             {
+                _currentPort = Port.Value;
                 _apiServer.Start(Port.Value);
             }
         }
@@ -40,16 +80,9 @@ namespace ResoniteApi
         {
             base.OnCommonUpdate();
 
-            IsRunning.Value = _apiServer.IsRunning;
-        }
-
-        protected override void OnChanges()
-        {
-            base.OnChanges();
-
-            if (Port.WasChanged)
+            if (Port.Value != _currentPort)
             {
-                // (Re-)start the API server with new port
+                // Port was changed, restart API server on new port.
                 if (_apiServer.IsRunning)
                 {
                     _apiServer.Stop();
@@ -57,9 +90,12 @@ namespace ResoniteApi
 
                 if (Port.Value > 0)
                 {
+                    _currentPort = Port.Value;
                     _apiServer.Start(Port.Value);
                 }
             }
+
+            IsRunning.Value = _apiServer.IsRunning;
         }
 
         /// <summary>

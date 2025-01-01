@@ -29,6 +29,14 @@
       <HintPath>$(ResonitePath)Resonite_Data\Managed\FrooxEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="SkyFrost.Base">
+      <HintPath>$(ResonitePath)Resonite_Data\Managed\SkyFrost.Base.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="SkyFrost.Base.Models">
+      <HintPath>$(ResonitePath)Resonite_Data\Managed\SkyFrost.Base.Models.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(ResonitePath)Resonite_Data\Managed\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
