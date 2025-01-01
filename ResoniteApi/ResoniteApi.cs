@@ -1,15 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Net;
-
 using FrooxEngine;
-using SkyFrost;
-using System.CodeDom;
-using SkyFrost.Base;
-using System.Linq;
-using System.Collections.Generic;
-using System.Runtime.Remoting.Contexts;
-using Elements.Core;
 
 namespace ResoniteApi
 {
@@ -36,34 +27,34 @@ namespace ResoniteApi
             IsRunning.Value = false;
             Port.Value = GetDefaultPort();
 
-            ApiServer.RegisterHandler(new ApiEndpoint("GET", "ping"), async (HttpListenerContext context, string[] arguments) =>
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "ping"), async (ApiRequest request) =>
             {
                 string response = "pong";
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(response));
             });
 
-            ApiServer.RegisterHandler(new ApiEndpoint("GET", "version"), async (HttpListenerContext context, string[] arguments) =>
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "version"), async (ApiRequest request) =>
             {
                 string version = Engine.VersionString;
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(version));
             });
 
-            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts"), async (HttpListenerContext context, string[] arguments) =>
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts"), async (ApiRequest request) =>
             {
-                Utils.ThrowIfClientIsResonite(context.Request); // Don't allow from within Resonite
+                Utils.ThrowIfClientIsResonite(request.Context.Request); // Don't allow from within Resonite
 
                 ContactResourceEnumerable contacts = new((await Cloud.Contacts.GetContacts()).Entity);
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(contacts.GetJsonRepresentation()));
             });
 
-            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts/{contactUserId}"), async (HttpListenerContext context, string[] arguments) =>
+            ApiServer.RegisterHandler(new ApiEndpoint("GET", "contacts/{contactUserId}"), async (ApiRequest request) =>
             {
-                Utils.ThrowIfClientIsResonite(context.Request); // Don't allow from within Resonite
+                Utils.ThrowIfClientIsResonite(request.Context.Request); // Don't allow from within Resonite
 
-                string contactUserId = arguments[0];
+                string contactUserId = request.Arguments[0];
                 ContactResource contact = new(Cloud.Contacts.GetContact(contactUserId));
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(contact.GetJsonRepresentation()));

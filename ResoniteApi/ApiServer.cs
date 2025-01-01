@@ -7,96 +7,13 @@ using Elements.Core;
 using System.Threading;
 using Newtonsoft.Json;
 using System.Linq;
-using Newtonsoft.Json.Serialization;
-using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
 
 namespace ResoniteApi
 {
-    internal class ApiEndpoint
-    {
-        private readonly string _method;
-        private readonly Uri _route;
-
-        public ApiEndpoint(string method, string route) : this(method, new Uri(route, UriKind.Relative)) { }
-
-        public ApiEndpoint(string method, Uri route)
-        {
-            _method = method;
-            _route = route;
-        }
-
-        public string Method => _method;
-        public Uri Route => _route;
-
-        public bool IsMatch(string targetMethod, Uri targetRoute, bool exactMatch)
-        {
-            if (_method.ToLower() != targetMethod.ToLower()) return false;
-
-            string[] routeSegments = Utils.GetRelativeUriPathSegments(_route);
-            string[] targetRouteSegments = Utils.GetRelativeUriPathSegments(targetRoute);
-            if (routeSegments.Length != targetRouteSegments.Length) return false;
-            for (int i = 0; i < routeSegments.Length; i++)
-            {
-                if (exactMatch)
-                {
-                    if (routeSegments[i] != targetRouteSegments[i]) return false;
-                }
-                else
-                {
-                    if (routeSegments[i] != targetRouteSegments[i] && !IsPlaceholder(routeSegments[i])) return false;
-                }
-            }
-
-            return true;
-        }
-
-        public string[] GetArgumentsForInputUrl(Uri targetRoute)
-        {
-            string[] routeSegments = Utils.GetRelativeUriPathSegments(_route);
-            string[] targetRouteSegments = Utils.GetRelativeUriPathSegments(targetRoute);
-
-            List<string> arguments = new();
-
-            for (int i = 0; i < routeSegments.Length; i++)
-            {
-                if (IsPlaceholder(routeSegments[i])) {
-                    arguments.Add(targetRouteSegments[i]);
-                }
-            }
-
-            return arguments.ToArray();
-        }
-
-        public static bool IsPlaceholder(string segment)
-        {
-            bool isPlaceholder = segment.StartsWith("%7B") && segment.EndsWith("%7D");
-            UniLog.Log($"[ResoniteApi] IsPlaceholder: '{segment}' -> {isPlaceholder}");
-            return isPlaceholder;
-        }
-
-        public override string ToString()
-        {
-            return $"{_method} -> '{_route}'";
-        }
-    }
-
-    internal struct ApiResponse
-    {
-        public int statusCode;
-        public string? content;
-
-        public ApiResponse(int statusCode, string? content)
-        {
-            this.statusCode = statusCode;
-            this.content = content;
-        }
-    }
-
     internal class ApiServer
     {
-        private static Dictionary<ApiEndpoint, Func<HttpListenerContext, string[], Task<ApiResponse>>> _handlers = new Dictionary<ApiEndpoint, Func<HttpListenerContext, string[], Task<ApiResponse>>>();
-        private HttpListener _listener;
+        private static readonly Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> _handlers = new();
+        private readonly HttpListener _listener;
         private bool _isRunning;
 
         private int? _port;
@@ -107,7 +24,7 @@ namespace ResoniteApi
         public bool IsRunning => _isRunning;
         public int? Port => _port;
 
-        public static void RegisterHandler(ApiEndpoint endpoint, Func<HttpListenerContext, string[], Task<ApiResponse>> handler)
+        public static void RegisterHandler(ApiEndpoint endpoint, Func<ApiRequest, Task<ApiResponse>> handler)
         {
             if (_handlers.ContainsKey(endpoint)) {
                 throw new ArgumentException($"A handler is already defined for endpoint {endpoint}!");
@@ -131,14 +48,14 @@ namespace ResoniteApi
             // First check for exact route match.
             foreach (ApiEndpoint endpoint in _handlers.Keys)
             {
-                if (endpoint.IsMatch(targetMethod, targetRoute, true)) {
+                if (endpoint.IsMatchForRequest(targetMethod, targetRoute, true)) {
                     return endpoint;
                 }
             }
 
             // No exact match found, check if one with placeholders matches.
             foreach (ApiEndpoint endpoint in _handlers.Keys) {
-                if (endpoint.IsMatch(targetMethod, targetRoute, false))
+                if (endpoint.IsMatchForRequest(targetMethod, targetRoute, false))
                 {
                     return endpoint;
                 }
@@ -150,11 +67,11 @@ namespace ResoniteApi
 
         private static async Task Respond(HttpListenerContext context, ApiResponse response)
         {
-            context.Response.StatusCode = response.statusCode;
+            context.Response.StatusCode = response.HttpStatusCode;
             context.Response.ContentType = "application/json";
-            if (response.content != null)
+            if (response.Content != null)
             {
-                byte[] buffer = Encoding.UTF8.GetBytes(response.content);
+                byte[] buffer = Encoding.UTF8.GetBytes(response.Content);
                 await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
             }
 
@@ -167,7 +84,7 @@ namespace ResoniteApi
             _isRunning = false;
 
             // Register default root handler.
-            RegisterHandler(new ApiEndpoint("GET", ""), async (HttpListenerContext context, string[] arguments) =>
+            RegisterHandler(new ApiEndpoint("GET", ""), async (ApiRequest request) =>
             {
                 string[] endpoints = (from endpoint in _handlers.Keys select endpoint.ToString()).ToArray();
                 return new ApiResponse(200, JsonConvert.SerializeObject(endpoints));
@@ -176,7 +93,7 @@ namespace ResoniteApi
 
         public void Start(int port)
         {
-            UniLog.Log($"[ResoniteApi] Starting API Server for port {port}...");
+            UniLog.Log($"[ResoniteApi] Starting API server for port {port}...");
             if (_isRunning)
             {
                 throw new ApplicationException("API server is already running!");
@@ -202,7 +119,7 @@ namespace ResoniteApi
 
         public void Stop()
         {
-            UniLog.Log($"[ResoniteApi] Stopping API Server...");
+            UniLog.Log($"[ResoniteApi] Stopping API server...");
             if (!_isRunning)
             {
                 throw new ApplicationException("API server is not running!");
@@ -231,22 +148,30 @@ namespace ResoniteApi
                     UniLog.Log($"[ResoniteApi] Received request: {context.Request.Url}, UserAgent: {context.Request.UserAgent}");
 
                     ApiResponse response = new ApiResponse(500, JsonConvert.SerializeObject("Something went wrong!"));
-
                     try
                     {
+                        // Ensure base Uri is defined
                         string httpMethod = context.Request.HttpMethod;
                         Uri baseUri = _baseUri ?? throw new ArgumentNullException(nameof(_baseUri));
-                        Uri relativeRequestUri = baseUri.MakeRelativeUri(context.Request.Url); // TODO: This creates a "negative" relative URI when directly calling baseUri without trailing slash!
+                        
+                        // Ensure the request Uri ends with a trailing slash before computing relative route Uri (otherwise it doesn't behave as expected)
+                        string requestUriString = context.Request.Url.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped);
+                        Uri requestUri = requestUriString.EndsWith("/") ? new(requestUriString, UriKind.Absolute) : new(requestUriString + "/", UriKind.Absolute);
+                        
+                        // Compute API route (relative Uri from base to request)
+                        Uri apiRoute = baseUri.MakeRelativeUri(requestUri);
 
-                        ApiEndpoint? endpoint = FindBestMatchingEndpoint(httpMethod, relativeRequestUri);
+                        ApiEndpoint? endpoint = FindBestMatchingEndpoint(httpMethod, apiRoute);
                         if (endpoint != null)
                         {
-                            string[] arguments = endpoint.GetArgumentsForInputUrl(relativeRequestUri);
-                            response = await _handlers[endpoint].Invoke(context, arguments);
+                            string[] arguments = endpoint.ParseRequestArguments(httpMethod, apiRoute);
+                            Dictionary<string, string> queryParams = new();
+                            ApiRequest request = new(context, arguments, queryParams);
+                            response = await _handlers[endpoint].Invoke(request);
                         }
                         else
                         {
-                            string error = $"Unknown endpoint!";
+                            string error = $"No endpoint found for route: '{apiRoute}'";
                             response = new ApiResponse(404, JsonConvert.SerializeObject(error));
                         }
                     }
