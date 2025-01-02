@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using FrooxEngine;
+using ResoniteApi.Resources;
 
 namespace ResoniteApi
 {
@@ -46,6 +47,8 @@ namespace ResoniteApi
                 Utils.ThrowIfClientIsResonite(request.Context.Request); // Don't allow from within Resonite
 
                 ContactResourceEnumerable contacts = new((await Cloud.Contacts.GetContacts()).Entity);
+                if (request.QueryParams.Count > 0) 
+                    contacts.FilterByQueryParams(request.QueryParams);
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(contacts.GetJsonRepresentation()));
             });
@@ -59,6 +62,19 @@ namespace ResoniteApi
 
                 return new ApiResponse(200, JsonConvert.SerializeObject(contact.GetJsonRepresentation()));
             });
+
+            //ApiServer.RegisterHandler(new ApiEndpoint("PUT", "contacts/{contactUserId}"), async (ApiRequest request) =>
+            //{
+            //    Utils.ThrowIfClientIsResonite(request.Context.Request); // Don't allow from within Resonite
+
+            //    string contactUserId = request.Arguments[0];
+            //    string itemName = request.Arguments[1];
+
+            //    object newValue = request.Context.Request.
+
+            //    ContactResource contact = new(Cloud.Contacts.GetContact(contactUserId));
+            //    contact[itemName] = request.Bo
+            //});
 
             if (Port.Value > 0)
             {

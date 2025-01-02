@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections.Specialized;
 using System.Net;
 
 namespace ResoniteApi
@@ -7,9 +7,9 @@ namespace ResoniteApi
     {
         private readonly HttpListenerContext _context;
         private readonly string[] _arguments;
-        private readonly Dictionary<string, string> _queryParams;
+        private readonly NameValueCollection _queryParams;
 
-        public ApiRequest(HttpListenerContext context, string[] arguments, Dictionary<string, string> queryParams)
+        public ApiRequest(HttpListenerContext context, string[] arguments, NameValueCollection queryParams)
         {
             _context = context;
             _arguments = arguments;
@@ -18,6 +18,6 @@ namespace ResoniteApi
 
         public HttpListenerContext Context => _context;
         public string[] Arguments => _arguments;
-        public Dictionary<string, string> QueryParams => _queryParams;
+        public NameValueCollection QueryParams => _queryParams;
     }
 }

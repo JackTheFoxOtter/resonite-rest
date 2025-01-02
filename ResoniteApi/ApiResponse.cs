@@ -7,8 +7,8 @@
 
         public ApiResponse(int statusCode, string? content)
         {
-            this._statusCode = statusCode;
-            this._content = content;
+            _statusCode = statusCode;
+            _content = content;
         }
 
         public int HttpStatusCode => _statusCode;

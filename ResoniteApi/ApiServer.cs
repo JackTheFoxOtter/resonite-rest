@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Threading.Tasks;
 using System.Net;
 using System.Text;
@@ -7,6 +8,8 @@ using Elements.Core;
 using System.Threading;
 using Newtonsoft.Json;
 using System.Linq;
+using System.Web;
+using ResoniteApi.Exceptions;
 
 namespace ResoniteApi
 {
@@ -165,7 +168,7 @@ namespace ResoniteApi
                         if (endpoint != null)
                         {
                             string[] arguments = endpoint.ParseRequestArguments(httpMethod, apiRoute);
-                            Dictionary<string, string> queryParams = new();
+                            NameValueCollection queryParams = HttpUtility.ParseQueryString(context.Request.Url.Query);
                             ApiRequest request = new(context, arguments, queryParams);
                             response = await _handlers[endpoint].Invoke(request);
                         }
