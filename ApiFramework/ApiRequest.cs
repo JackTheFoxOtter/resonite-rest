@@ -1,9 +1,9 @@
 ﻿using System.Collections.Specialized;
 using System.Net;
 
-namespace ResoniteApi
+namespace ApiFramework
 {
-    internal class ApiRequest
+    public class ApiRequest
     {
         private readonly HttpListenerContext _context;
         private readonly string[] _arguments;

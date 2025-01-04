@@ -1,6 +1,6 @@
-﻿namespace ResoniteApi
+﻿namespace ApiFramework
 {
-    internal struct ApiResponse
+    public class ApiResponse
     {
         private readonly int _statusCode;
         private readonly string? _content;

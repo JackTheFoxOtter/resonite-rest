@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <RootNamespace>ResoniteApi</RootNamespace>
-    <AssemblyName>ResoniteApi</AssemblyName>
+    <RootNamespace>ApiFramework</RootNamespace>
+    <AssemblyName>ApiFramework</AssemblyName>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>11.0</LangVersion>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- Change CopyToLibraries to true if you'd like builds to be moved into the Libraries folder automatically-->
     <CopyToLibraries Condition="'$(CopyToLibraries)'==''">true</CopyToLibraries>
@@ -21,33 +21,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ApiFramework\ApiFramework.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="Elements.Core">
-      <HintPath>$(ResonitePath)Resonite_Data\Managed\Elements.Core.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="FrooxEngine">
-      <HintPath>$(ResonitePath)Resonite_Data\Managed\FrooxEngine.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="SkyFrost.Base">
-      <HintPath>$(ResonitePath)Resonite_Data\Managed\SkyFrost.Base.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="SkyFrost.Base.Models">
-      <HintPath>$(ResonitePath)Resonite_Data\Managed\SkyFrost.Base.Models.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\..\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\Elements.Core.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>$(ResonitePath)Resonite_Data\Managed\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
+      <HintPath>..\..\..\SteamLibrary\steamapps\common\Resonite\Resonite_Data\Managed\Newtonsoft.Json.dll</HintPath>
     </Reference>
-    <Reference Include="System.Web">
-      <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2\System.Web.dll</HintPath>
-    </Reference>
+    <Reference Include="System.Web" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(CopyToLibraries)'=='true'">

@@ -1,24 +1,25 @@
-﻿using FrooxEngine;
+﻿using ApiFramework;
 using SkyFrost.Base;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ResoniteApi.Resources
 {
     internal class ContactResourceEnumerable : ApiResourceEnumerable<ContactResource>
     {
         private IEnumerator<ContactResource> _enumerator;
-
-        public ContactResourceEnumerable(IEnumerable<Contact> cloudContacts)
-        {
-            IEnumerable<ContactResource> contacts = from cloudContact in cloudContacts select new ContactResource(cloudContact);
-            _enumerator = contacts.GetEnumerator();
-        }
-
+        
         protected override IEnumerator<ContactResource> Enumerator
         {
             get { return _enumerator; }
             set { _enumerator = value; }
         }
+
+        public ContactResourceEnumerable(IEnumerable<ContactResource> contacts) : base(contacts) { }
+
+        public ContactResourceEnumerable(IEnumerable<Contact> skyFrostContacts) : base(from skyFrostContact in skyFrostContacts select new ContactResource(skyFrostContact)) { }
+
+        //protected static IEnumerable<ContactResource> ResourcesFromSkyFrostContacts(IEnumerable<Contact> skyFrostContacts)
+        //{
+        //    return from skyFrostContact in skyFrostContacts select new ContactResource(skyFrostContact);
+        //}
     }
 }

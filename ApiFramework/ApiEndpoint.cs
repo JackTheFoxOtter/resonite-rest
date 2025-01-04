@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ResoniteApi
+namespace ApiFramework
 {
-    internal class ApiEndpoint
+    public class ApiEndpoint
     {
         private readonly string _httpMethod;
         private readonly Uri _route;

@@ -1,9 +1,7 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
+﻿using System.Reflection;
+using Newtonsoft.Json;
+using ApiFramework.Resources;
+
 namespace ResoniteApi
 {
     internal class SkyFrostApiResourceWrapper<T> : ApiResource where T : notnull
@@ -21,7 +19,13 @@ namespace ResoniteApi
                         continue;
                     }
 
-                    AddItem(propertyAttr.PropertyName, property.GetValue(skyFrostResource));
+                    object? propertyValue = property.GetValue(skyFrostResource);
+                    if (property.PropertyType.IsEnum && propertyValue != null)
+                    {
+                        propertyValue = propertyValue.ToString();
+                    }
+
+                    AddItem(propertyAttr.PropertyName, propertyValue, property.PropertyType);
                 }
             }
         }
@@ -43,7 +47,13 @@ namespace ResoniteApi
                             continue;
                         }
 
-                        property.SetValue(skyFrostResource, this[propertyAttr.PropertyName].Value);
+                        object? propertyValue = this[propertyAttr.PropertyName].Value;
+                        if (property.PropertyType.IsEnum && propertyValue != null)
+                        {
+                            propertyValue = Enum.Parse(property.PropertyType, propertyValue.ToString());
+                        }
+
+                        property.SetValue(skyFrostResource, propertyValue);
                     }
                 }
 

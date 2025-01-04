@@ -1,21 +1,21 @@
-﻿using System;
+﻿using ApiFramework.Exceptions;
+using Elements.Core;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Net;
 using System.Text;
-using Elements.Core;
 using System.Threading;
-using Newtonsoft.Json;
-using System.Linq;
+using System.Threading.Tasks;
 using System.Web;
-using ResoniteApi.Exceptions;
 
-namespace ResoniteApi
+namespace ApiFramework
 {
-    internal class ApiServer
+    public class ApiServer
     {
-        private static readonly Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> _handlers = new();
+        private readonly Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> _handlers = new();
         private readonly HttpListener _listener;
         private bool _isRunning;
 
@@ -27,7 +27,7 @@ namespace ResoniteApi
         public bool IsRunning => _isRunning;
         public int? Port => _port;
 
-        public static void RegisterHandler(ApiEndpoint endpoint, Func<ApiRequest, Task<ApiResponse>> handler)
+        public void RegisterHandler(ApiEndpoint endpoint, Func<ApiRequest, Task<ApiResponse>> handler)
         {
             if (_handlers.ContainsKey(endpoint)) {
                 throw new ArgumentException($"A handler is already defined for endpoint {endpoint}!");
@@ -37,7 +37,7 @@ namespace ResoniteApi
             _handlers.Add(endpoint, handler);
         }
 
-        public static void RemoveHandler(ApiEndpoint endpoint)
+        public void RemoveHandler(ApiEndpoint endpoint)
         {
             if (_handlers.ContainsKey(endpoint))
             {
@@ -48,7 +48,6 @@ namespace ResoniteApi
 
         private ApiEndpoint? FindBestMatchingEndpoint(string targetMethod, Uri targetRoute)
         {
-            // First check for exact route match.
             foreach (ApiEndpoint endpoint in _handlers.Keys)
             {
                 if (endpoint.IsMatchForRequest(targetMethod, targetRoute, true)) {
@@ -56,7 +55,6 @@ namespace ResoniteApi
                 }
             }
 
-            // No exact match found, check if one with placeholders matches.
             foreach (ApiEndpoint endpoint in _handlers.Keys) {
                 if (endpoint.IsMatchForRequest(targetMethod, targetRoute, false))
                 {
@@ -64,18 +62,20 @@ namespace ResoniteApi
                 }
             }
 
-            // No match found.
             return null;
         }
 
-        private static async Task Respond(HttpListenerContext context, ApiResponse response)
+        private static async Task Respond(HttpListenerContext context, ApiResponse? response)
         {
-            context.Response.StatusCode = response.HttpStatusCode;
-            context.Response.ContentType = "application/json";
-            if (response.Content != null)
+            if (response != null)
             {
-                byte[] buffer = Encoding.UTF8.GetBytes(response.Content);
-                await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                context.Response.StatusCode = response.HttpStatusCode;
+                context.Response.ContentType = "application/json";
+                if (response.Content != null)
+                {
+                    byte[] buffer = Encoding.UTF8.GetBytes(response.Content);
+                    await context.Response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
+                }
             }
 
             context.Response.Close();
@@ -150,17 +150,17 @@ namespace ResoniteApi
                     HttpListenerContext context = await _listener.GetContextAsync().WrapCancellable(cancellationToken);
                     UniLog.Log($"[ResoniteApi] Received request: {context.Request.Url}, UserAgent: {context.Request.UserAgent}");
 
-                    ApiResponse response = new ApiResponse(500, JsonConvert.SerializeObject("Something went wrong!"));
+                    ApiResponse? response = null;
                     try
                     {
                         // Ensure base Uri is defined
                         string httpMethod = context.Request.HttpMethod;
                         Uri baseUri = _baseUri ?? throw new ArgumentNullException(nameof(_baseUri));
-                        
+
                         // Ensure the request Uri ends with a trailing slash before computing relative route Uri (otherwise it doesn't behave as expected)
                         string requestUriString = context.Request.Url.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped);
                         Uri requestUri = requestUriString.EndsWith("/") ? new(requestUriString, UriKind.Absolute) : new(requestUriString + "/", UriKind.Absolute);
-                        
+
                         // Compute API route (relative Uri from base to request)
                         Uri apiRoute = baseUri.MakeRelativeUri(requestUri);
 
@@ -178,17 +178,33 @@ namespace ResoniteApi
                             response = new ApiResponse(404, JsonConvert.SerializeObject(error));
                         }
                     }
-                    catch (ForbiddenUserAgentException ex)
+                    catch (ApiException apiEx)
                     {
-                        string error = $"Endpoint forbidden for user agent: '{ex.UserAgent}'";
-                        response = new ApiResponse(403, JsonConvert.SerializeObject(error));
+                        response = apiEx.ToResponse();
+                    }
+                    catch (AggregateException aggregateEx)
+                    {
+                        foreach (Exception innerEx in aggregateEx.Flatten().InnerExceptions)
+                        {
+                            if (innerEx is ApiException apiEx)
+                            {
+                                response = apiEx.ToResponse();
+                                break;
+                            }
+                        }
+
+                        if (response == null)
+                        { 
+                            string error = $"One or more unhandled exception while processing request: {aggregateEx}";
+                            response = new ApiResponse(500, JsonConvert.SerializeObject(error));
+                            throw;
+                        }
                     }
                     catch (Exception ex)
                     {
-                        string error = $"Exception occured while processing request: {ex}";
+                        string error = $"Unhandled exception while processing request: {ex}";
                         response = new ApiResponse(500, JsonConvert.SerializeObject(error));
-                        
-                        throw ex;
+                        throw;
                     }
                     finally
                     {
@@ -207,6 +223,5 @@ namespace ResoniteApi
                 }
             }
         }
-        
     }
 }
