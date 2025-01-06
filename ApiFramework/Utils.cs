@@ -47,8 +47,18 @@ namespace ApiFramework
         /// <returns>True if the segment follows the placeholder syntax.</returns>
         internal static bool IsPlaceholder(string segment)
         {
-            bool isPlaceholder = (segment.StartsWith("{") || segment.StartsWith("%7B")) && (segment.EndsWith("}") || segment.EndsWith("%7D"));
-            return isPlaceholder;
+            return (segment.StartsWith("{") || segment.StartsWith("%7B")) && (segment.EndsWith("}") || segment.EndsWith("%7D"));
+        }
+
+        /// <summary>
+        /// Returns true if the input string matches the 'greedy placeholder' syntax. ('{...}')
+        /// Checks for both unescaped and URI-escaped variants.
+        /// </summary>
+        /// <param name="segment">Segment string to check (usually segment of request URI)</param>
+        /// <returns>True if the segment follows the 'greedy placeholder' syntax.</returns>
+        internal static bool IsGreedyPlaceholder(string segment)
+        {
+            return segment.Equals("{...}") || segment.Equals("%7B...%7D");
         }
 
         /// <summary>

@@ -1,0 +1,28 @@
+[uDD::Log][2025-01-06 22:29:15] Start
+[uDD::Log][2025-01-06 22:29:15] OS Version    : 10.0
+[uDD::Log][2025-01-06 22:29:15] Build Number  : 26100
+[uDD::Log][2025-01-06 22:29:15] Service Pack  : 
+[uDD::Log][2025-01-06 22:29:15] Graphics Card [0] : NVIDIA GeForce RTX 3080
+[uDD::Log][2025-01-06 22:29:15]   > Monitor[0] : \\.\DISPLAY1
+[uDD::Log][2025-01-06 22:29:15]   > Monitor[1] : \\.\DISPLAY2
+[uDD::Log][2025-01-06 22:29:15]   > Monitor[2] : \\.\DISPLAY3
+[uDD::Log][2025-01-06 22:29:15] Graphics Card [1] : AMD Radeon(TM) Graphics
+[uDD::Log][2025-01-06 22:29:15] Graphics Card [2] : Microsoft Basic Render Driver
+[uDD::Log][2025-01-06 22:29:15] Monitor::Initialized() =>
+[uDD::Log][2025-01-06 22:29:15]     ID    : 0
+[uDD::Log][2025-01-06 22:29:15]     Size  : (2560, 1440)
+[uDD::Log][2025-01-06 22:29:15]     DPI   : (108, 108)
+[uDD::Log][2025-01-06 22:29:15]     Rot   : Landscape
+[uDD::Log][2025-01-06 22:29:15] Duplicator::Initialize() => OK.
+[uDD::Log][2025-01-06 22:29:15] Monitor::Initialized() =>
+[uDD::Log][2025-01-06 22:29:15]     ID    : 1
+[uDD::Log][2025-01-06 22:29:15]     Size  : (1920, 1080)
+[uDD::Log][2025-01-06 22:29:15]     DPI   : (101, 101)
+[uDD::Log][2025-01-06 22:29:15]     Rot   : Landscape
+[uDD::Log][2025-01-06 22:29:15] Duplicator::Initialize() => OK.
+[uDD::Log][2025-01-06 22:29:15] Monitor::Initialized() =>
+[uDD::Log][2025-01-06 22:29:15]     ID    : 2
+[uDD::Log][2025-01-06 22:29:15]     Size  : (1920, 1080)
+[uDD::Log][2025-01-06 22:29:15]     DPI   : (101, 101)
+[uDD::Log][2025-01-06 22:29:15]     Rot   : Landscape
+[uDD::Log][2025-01-06 22:29:15] Duplicator::Initialize() => OK.

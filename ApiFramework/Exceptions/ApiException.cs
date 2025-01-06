@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Net;
 
 namespace ApiFramework.Exceptions
 {
@@ -11,7 +10,15 @@ namespace ApiFramework.Exceptions
         public int StatusCode => _statusCode;
 
         public ApiException() : this(500) { }
+        
         public ApiException(int statusCode) : base()
+        {
+            _statusCode = statusCode;
+        }
+
+        public ApiException(string message) : this(500, message) {}
+        
+        public ApiException(int statusCode, string message) : base(message)
         {
             _statusCode = statusCode;
         }

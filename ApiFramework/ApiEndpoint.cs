@@ -30,7 +30,7 @@ namespace ApiFramework
         /// </summary>
         /// <param name="targetHttpMethod">HttpMethod of the target request</param>
         /// <param name="targetRoute">Route of the target request</param>
-        /// <param name="exactMatch">Wether to use exact matching only or also consider placeholders in the endpoint route.</param>
+        /// <param name="exactMatch">Whether to use exact matching only or also consider placeholders in the endpoint route.</param>
         /// <returns>True if this endpoint is a match for the target request.</returns>
         public bool IsMatchForRequest(string targetHttpMethod, Uri targetRoute, bool exactMatch)
         {
@@ -38,7 +38,18 @@ namespace ApiFramework
 
             string[] endpointRouteSegments = Utils.GetRelativeUriPathSegments(_route);
             string[] targetRouteSegments = Utils.GetRelativeUriPathSegments(targetRoute);
-            if (endpointRouteSegments.Length != targetRouteSegments.Length) return false;
+
+            if (!exactMatch && Utils.IsGreedyPlaceholder(endpointRouteSegments[endpointRouteSegments.Length - 1]))
+            {
+                // Greedy placeholder matches n number of elements, so any length >= its index could match
+                if (targetRouteSegments.Length < endpointRouteSegments.Length - 1) return false;
+            }
+            else
+            {
+                // Otherwise matches have to be of equal length
+                if (targetRouteSegments.Length != endpointRouteSegments.Length) return false;
+            }
+            
             for (int i = 0; i < endpointRouteSegments.Length; i++)
             {
                 if (exactMatch)
@@ -47,6 +58,7 @@ namespace ApiFramework
                 }
                 else
                 {
+                    if (Utils.IsGreedyPlaceholder(endpointRouteSegments[i])) return true; // Greedy placeholder matches n number of elements, so we can skip checking further
                     if (endpointRouteSegments[i] != targetRouteSegments[i] && !Utils.IsPlaceholder(endpointRouteSegments[i])) return false;
                 }
             }
@@ -73,11 +85,13 @@ namespace ApiFramework
 
             List<string> arguments = new();
 
-            for (int i = 0; i < endpointRouteSegments.Length; i++)
+            bool greedyFlag = false;
+            for (int i = 0; i < targetRouteSegments.Length; i++)
             {
-                if (Utils.IsPlaceholder(endpointRouteSegments[i]))
+                if (greedyFlag || Utils.IsPlaceholder(endpointRouteSegments[i]))
                 {
                     arguments.Add(targetRouteSegments[i]);
+                    if (!greedyFlag && Utils.IsGreedyPlaceholder(endpointRouteSegments[i])) greedyFlag = true;
                 }
             }
 

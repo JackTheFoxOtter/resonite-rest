@@ -1,66 +1,124 @@
-﻿using ApiFramework.Exceptions;
-using Newtonsoft.Json;
+﻿using ApiFramework.Interfaces;
+using Newtonsoft.Json.Linq;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace ApiFramework.Resources
 {
-    public abstract class ApiResource
+    public abstract class ApiResource : IApiItemContainer
     {
-        private readonly Dictionary<string, ApiItem> _items;
+        private readonly IApiItem _rootItem;
+        private readonly bool _canEdit;
+
+        public IApiItem RootItem => _rootItem;
 
         public ApiResource()
         {
-            _items = new Dictionary<string, ApiItem>();
+            _rootItem = new ApiItemDict(this, CanEditItemCheck(new string[] { }));
+            _canEdit = _rootItem.CanEdit();
         }
 
-        protected void AddItem(string name, object? item)
+        public ApiResource(IApiItem rootItem)
         {
-            _items.Add(name, new ApiItem(name, item, false));
+            _rootItem = rootItem;
+            _canEdit = rootItem.CanEdit();
         }
 
-        protected void AddItem(string name, object? item, bool readOnly)
+        public ApiResource(string json)
         {
-            _items.Add(name, new ApiItem(name, item, readOnly));
+            _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
+            _canEdit = _rootItem.CanEdit();
         }
 
-        protected void AddItem(string name, object? item, Type type)
+        public ApiResource(JToken json)
         {
-            _items.Add(name, new ApiItem(name, item, false, type));
+            _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
+            _canEdit = _rootItem.CanEdit();
         }
 
-        protected void AddItem(string name, object? item, bool readOnly, Type type)
+        public int Count()
         {
-            _items.Add(name, new ApiItem(name, item, readOnly, type));
+            return 1;
         }
 
-        public bool ContainsItem(string name)
+        public bool CanEdit()
         {
-            return _items.ContainsKey(name);
+            return _canEdit;
         }
 
-        public ApiItem? this[string name]
+        public bool Contains(IApiItem item)
         {
-            get
+            return item == _rootItem;
+        }
+
+        public IApiItem? GetItemAtPath(string[] itemPath)
+        {
+            IApiItem? item = RootItem;
+            foreach (string pathSegment in itemPath)
             {
-                if (ContainsItem(name))
+                if (item is ApiItemDict itemDict)
                 {
-                    return _items[name];
+                    if (itemDict.ContainsKey(pathSegment))
+                    {
+                        item = itemDict[pathSegment];
+                        continue;
+                    }
+                }
+                else if (item is ApiItemList itemList)
+                {
+                    if (int.TryParse(pathSegment, out int index))
+                    {
+                        if (index < itemList.Count())
+                        {
+                            item = itemList[index];
+                            continue;
+                        }
+                    }
                 }
 
-                return null;
+                // Arrived here -> not found
+                item = null;
             }
+
+            return item;
         }
 
-        public Dictionary<string, object?> GetJsonRepresentation()
+        public bool ContainsItemAtPath(string[] itemPath)
         {
-            return _items.ToDictionary(kv => kv.Key, kv => kv.Value.Value);
+            IApiItem? item = GetItemAtPath(itemPath);
+            return item != null;
+        }
+
+        public string NameOf(IApiItem item)
+        {
+            if (item != _rootItem) throw new ArgumentException($"ApiResource doesn't contain item {item}");
+            return ToString();
+        }
+
+        public JToken ToJsonRepresentation()
+        {
+            return _rootItem.ToJsonRepresentation();
+        }
+
+        public string ToJson()
+        {
+            return _rootItem.ToJson();
         }
 
         public ApiResponse ToResponse()
         {
-            return new ApiResponse(200, JsonConvert.SerializeObject(GetJsonRepresentation()));
+            return _rootItem.ToResponse();
         }
+
+        public virtual bool CanEditItemCheck(string[] itemPath)
+        {
+            return true;
+        }
+
+        public override string ToString()
+        {
+            return GetResourceName();
+        }
+
+        public abstract string GetResourceName();
     }
 }

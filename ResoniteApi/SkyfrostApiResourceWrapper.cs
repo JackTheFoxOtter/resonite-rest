@@ -1,64 +1,33 @@
-﻿using System.Reflection;
+﻿using ApiFramework.Resources;
 using Newtonsoft.Json;
-using ApiFramework.Resources;
 
 namespace ResoniteApi
 {
-    internal class SkyFrostApiResourceWrapper<T> : ApiResource where T : notnull
+    internal abstract class SkyFrostApiResourceWrapper<T> : ApiResource
     {
-        public SkyFrostApiResourceWrapper(T skyFrostResource)
-        {
-            foreach (var property in skyFrostResource.GetType().GetProperties())
-            {
-                JsonPropertyAttribute? propertyAttr = property.GetCustomAttribute<JsonPropertyAttribute>();
-                if (propertyAttr != null && propertyAttr.PropertyName != null)
-                {
-                    ObsoleteAttribute? obsoleteAttr = property.GetCustomAttribute<ObsoleteAttribute>();
-                    if (obsoleteAttr != null)
-                    {
-                        continue;
-                    }
+        public SkyFrostApiResourceWrapper(T skyFrostResource) : base(ToJson(skyFrostResource)) { }
 
-                    object? propertyValue = property.GetValue(skyFrostResource);
-                    if (property.PropertyType.IsEnum && propertyValue != null)
-                    {
-                        propertyValue = propertyValue.ToString();
-                    }
-
-                    AddItem(propertyAttr.PropertyName, propertyValue, property.PropertyType);
-                }
-            }
-        }
-
-        public T SkyFrostResource
+        public T? SkyFrostResource
         {
             get
             {
-                T skyFrostResource = Activator.CreateInstance<T>();
-
-                foreach (var property in skyFrostResource.GetType().GetProperties())
-                {
-                    JsonPropertyAttribute? propertyAttr = property.GetCustomAttribute<JsonPropertyAttribute>();
-                    if (propertyAttr != null && propertyAttr.PropertyName != null)
-                    {
-                        ObsoleteAttribute? obsoleteAttr = property.GetCustomAttribute<ObsoleteAttribute>();
-                        if (obsoleteAttr != null)
-                        {
-                            continue;
-                        }
-
-                        object? propertyValue = this[propertyAttr.PropertyName].Value;
-                        if (property.PropertyType.IsEnum && propertyValue != null)
-                        {
-                            propertyValue = Enum.Parse(property.PropertyType, propertyValue.ToString());
-                        }
-
-                        property.SetValue(skyFrostResource, propertyValue);
-                    }
-                }
-
-                return skyFrostResource;
+                return FromJson(ToJson());
             }
+        }
+        
+        public override string GetResourceName()
+        {
+            return nameof(T);
+        }
+
+        public static string ToJson(T skyFrostResource)
+        {
+            return JsonConvert.SerializeObject(skyFrostResource);
+        }
+
+        public static T? FromJson(string json)
+        {
+            return (T?) JsonConvert.DeserializeObject(json, typeof(T));
         }
     }
 }

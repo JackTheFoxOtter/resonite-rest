@@ -1,12 +1,13 @@
-﻿using Elements.Core;
-using ApiFramework.Exceptions;
+﻿using ApiFramework.Exceptions;
+using ApiFramework.Interfaces;
+using ApiFramework.Resources;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using ApiFramework.Resources;
-using Newtonsoft.Json;
 
 namespace ApiFramework
 {
@@ -51,26 +52,17 @@ namespace ApiFramework
                 {
                     if (argumentName == null) continue;
 
-                    if (!resource.ContainsItem(argumentName))
+                    IApiItem? resourceItem = resource.GetItemAtPath(argumentName.Split('.'));
+                    if (resourceItem == null)
                     {
-                        throw new ApiResourceItemNotFoundException(typeof(T), argumentName);
+                        return false;
                     }
 
-                    string? resourceValue = resource[argumentName].Value?.ToString();
+                    string resourceValue = resourceItem.ToJson();
                     string comparisonValue = queryParams[argumentName];
-                    if (resourceValue == null)
+                    if (!resourceValue.Equals(comparisonValue, StringComparison.InvariantCulture))
                     {
-                        if (!comparisonValue.Equals("~null~", StringComparison.InvariantCulture))
-                        {
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        if (!resourceValue.Equals(comparisonValue, StringComparison.InvariantCulture))
-                        {
-                            return false;
-                        }
+                        return false;
                     }
                 }
 
@@ -80,14 +72,19 @@ namespace ApiFramework
             return (ApiResourceEnumerable<T>) Activator.CreateInstance(GetType(), new object[] { filtered });
         }
 
-        public IEnumerable<Dictionary<string, object>> GetJsonRepresentation()
+        public JArray ToJsonRepresentation()
         {
-            return from resource in this select resource.GetJsonRepresentation();
+            return new JArray(from resource in this select resource.ToJsonRepresentation());
+        }
+
+        public string ToJson()
+        {
+            return JsonConvert.SerializeObject(ToJsonRepresentation());
         }
 
         public ApiResponse ToResponse()
         {
-            return new ApiResponse(200, JsonConvert.SerializeObject(GetJsonRepresentation()));
+            return new ApiResponse(200, ToJson());
         }
     }
 }

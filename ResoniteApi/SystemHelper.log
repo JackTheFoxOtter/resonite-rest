@@ -1,0 +1,15 @@
+06.01.2025 21:29:09	Connecting to 127.0.0.1:59642
+06.01.2025 21:29:09	Connected
+06.01.2025 21:29:09	Got command: GetUID
+06.01.2025 21:30:21	IO Exception:
+System.IO.IOException: Von der Übertragungsverbindung können keine Daten gelesen werden: Eine vorhandene Verbindung wurde vom Remotehost geschlossen. ---> System.Net.Sockets.SocketException: Eine vorhandene Verbindung wurde vom Remotehost geschlossen
+   bei System.Net.Sockets.Socket.Receive(Byte[] buffer, Int32 offset, Int32 size, SocketFlags socketFlags)
+   bei System.Net.Sockets.NetworkStream.Read(Byte[] buffer, Int32 offset, Int32 size)
+   --- Ende der internen Ausnahmestapelüberwachung ---
+   bei System.Net.Sockets.NetworkStream.Read(Byte[] buffer, Int32 offset, Int32 size)
+   bei System.IO.Stream.ReadByte()
+   bei System.IO.BinaryReader.ReadByte()
+   bei Elements.Core.BinaryReaderExtensions.Read7BitEncoded(BinaryReader br)
+   bei Elements.Core.BinaryReaderExtensions.ReadEnumBinary[E](BinaryReader br)
+   bei SystemHelperServer.SystemHelper.Main(String[] args)
+06.01.2025 21:30:21	Exiting...

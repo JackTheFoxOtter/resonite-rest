@@ -2,6 +2,7 @@
 using ApiFramework.Resources;
 using FrooxEngine;
 using SkyFrost.Base;
+using System.Collections.Specialized;
 
 namespace ResoniteApi.Resources
 {
@@ -26,14 +27,14 @@ namespace ResoniteApi.Resources
             Utils.ThrowIfClientIsResonite(request.Context.Request); // Don't allow from within Resonite
         }
 
-        protected override async Task<ApiResourceEnumerable<ContactResource>> GetAllResources()
+        protected override async Task<ApiResourceEnumerable<ContactResource>> QueryResources(NameValueCollection queryParams)
         {
             IEnumerable<Contact> skyFrostContacts = (await Cloud.Contacts.GetContacts()).Entity;
 
-            return new ContactResourceEnumerable(skyFrostContacts);
+            return new ContactResourceEnumerable(skyFrostContacts).FilterByQueryParams(queryParams);
         }
 
-        protected override async Task<ContactResource?> GetResource(string resourceId)
+        protected override async Task<ContactResource?> SelectResource(string resourceId)
         {
             Contact? skyFrostContact = Cloud.Contacts.GetContact(resourceId);
             if (skyFrostContact != null)
@@ -44,12 +45,21 @@ namespace ResoniteApi.Resources
             return null;
         }
 
-        protected override async Task CreateResource(ContactResource resource)
+        protected override async Task<bool> CreateResource(ContactResource resource)
         {
             throw new NotImplementedException();
+            //Contact skyFrostContact = resource.SkyFrostResource;
+            //return await Cloud.Contacts.AddContact(skyFrostContact);
         }
 
-        protected override async Task UpdateResource(ContactResource resource)
+        protected override async Task<bool> UpdateResource(ContactResource resource)
+        {
+            throw new NotImplementedException();
+            //Contact skyFrostContact = resource.SkyFrostResource;
+            //return await Cloud.Contacts.RemoveContact(skyFrostContact);
+        }
+
+        protected override async Task<bool> DeleteResource(ContactResource resource)
         {
             throw new NotImplementedException();
         }

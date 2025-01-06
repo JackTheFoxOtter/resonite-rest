@@ -1,5 +1,7 @@
 ﻿using ApiFramework;
+using ApiFramework.Interfaces;
 using ApiFramework.Resources;
+using System.Collections.Specialized;
 
 namespace ResoniteApi.Resources
 {
@@ -26,19 +28,40 @@ namespace ResoniteApi.Resources
             return new DummyContactResourceEnumerable(contacts);
         }
 
-        protected override async Task<DummyContactResource?> GetResource(string resourceId)
+        protected override async Task<DummyContactResource?> SelectResource(string resourceId)
         {
-            DummyContactResource? contactResouce = (from contact in await GetAllResources() where contact["ContactId"]?.Value?.ToString() == resourceId select contact).FirstOrDefault();
+            bool predicate(DummyContactResource resource)
+            {
+                IApiItem? item = resource.GetItemAtPath(new string[] { "ContactId" });
+                if (item is ApiItemValue<string> itemValue)
+                {
+                    return resourceId == itemValue.Value;
+                }
+
+                return false;
+            }
+
+            DummyContactResource? contactResouce = (from contact in await GetAllResources() where predicate(contact) select contact).FirstOrDefault();
 
             return contactResouce;
         }
 
-        protected override async Task CreateResource(DummyContactResource resource)
+        protected override async Task<bool> CreateResource(DummyContactResource resource)
         {
             throw new NotImplementedException();
         }
 
-        protected override async Task UpdateResource(DummyContactResource resource)
+        protected override async Task<bool> UpdateResource(DummyContactResource resource)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override Task<ApiResourceEnumerable<DummyContactResource>> QueryResources(NameValueCollection queryParams)
+        {
+            throw new NotImplementedException();
+        }
+
+        protected override Task<bool> DeleteResource(DummyContactResource resource)
         {
             throw new NotImplementedException();
         }

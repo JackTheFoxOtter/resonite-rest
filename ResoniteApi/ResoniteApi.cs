@@ -42,7 +42,8 @@ namespace ResoniteApi
                 return new ApiResponse(200, JsonConvert.SerializeObject(version));
             });
 
-            ContactResourceManager contactManager = new(_apiServer, "contact", Cloud);
+            ContactResourceManager contactManager = new(_apiServer, "contacts", Cloud);
+            UserResourceManager userManager = new(_apiServer, "users", Cloud);
 
             if (Port.Value > 0)
             {

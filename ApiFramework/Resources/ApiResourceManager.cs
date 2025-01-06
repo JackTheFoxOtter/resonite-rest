@@ -1,19 +1,19 @@
-﻿using System;
+﻿using ApiFramework.Exceptions;
+using ApiFramework.Interfaces;
+using System;
+using System.Collections.Specialized;
+using System.Linq;
 using System.Threading.Tasks;
-using ApiFramework.Exceptions;
-using Elements.Core;
 
 namespace ApiFramework.Resources
 {
     public abstract class ApiResourceManager<T> where T : ApiResource
     {
         private readonly ApiServer _server;
-        private readonly ApiEndpoint _endpointGetResources;
-        private readonly ApiEndpoint _endpointGetResource;
-        private readonly ApiEndpoint _endpointGetResourceItem;
+        private readonly ApiEndpoint _endpointQueryResources;
+        private readonly ApiEndpoint _endpointSelectResource;
         private readonly ApiEndpoint _endpointCreateResource;
         private readonly ApiEndpoint _endpointUpdateResource;
-        private readonly ApiEndpoint _endpointUpdateResourceItem;
         private readonly ApiEndpoint _endpointDeleteResource;
 
         public ApiServer Server => _server;
@@ -23,59 +23,71 @@ namespace ApiFramework.Resources
         public ApiResourceManager(ApiServer server, Uri baseRoute)
         {
             _server = server;
+            _endpointQueryResources = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/"));
+            _endpointSelectResource = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
+            _endpointCreateResource = new ApiEndpoint("POST",   Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
+            _endpointUpdateResource = new ApiEndpoint("PATCH",  Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
+            _endpointDeleteResource = new ApiEndpoint("DELETE", Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
 
-            UniLog.Log($"[ResoniteApi] BaseRoute: '{baseRoute}'");
-
-            _endpointGetResources =       new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/"));
-            _endpointGetResource =        new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
-            _endpointGetResourceItem =    new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{itemName}"));
-            _endpointCreateResource =     new ApiEndpoint("PUT",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
-            _endpointUpdateResource =     new ApiEndpoint("PATCH",  Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
-            _endpointUpdateResourceItem = new ApiEndpoint("PATCH",  Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{itemName}"));
-            _endpointDeleteResource =     new ApiEndpoint("DELETE", Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
-
-            server.RegisterHandler(_endpointGetResources, async (ApiRequest request) =>
+            // To query for resources based on query params
+            server.RegisterHandler(_endpointQueryResources, async (ApiRequest request) =>
             {
                 await CheckRequest(request);
 
-                ApiResourceEnumerable<T> resources = (await GetAllResources()).FilterByQueryParams(request.QueryParams);
+                ApiResourceEnumerable<T> resources = await QueryResources(request.QueryParams); // (await GetAllResources()).FilterByQueryParams(request.QueryParams);
 
                 return resources.ToResponse();
             });
 
-            server.RegisterHandler(_endpointGetResource, async (ApiRequest request) =>
+            // To select & retrieve a known resource (or an item within) directly by id
+            server.RegisterHandler(_endpointSelectResource, async (ApiRequest request) =>
             {
                 await CheckRequest(request);
 
-                string requestId = request.Arguments[0];
-
-                T? resource = await GetResource(requestId) ?? throw new ApiResourceNotFoundException(typeof(T), requestId);
-
-                return resource.ToResponse();
+                string resourceId = request.Arguments[0];
+                string[] itemPath = request.Arguments.Skip(1).ToArray();
+                
+                T? resource = await SelectResource(resourceId) ?? throw new ApiResourceNotFoundException(typeof(T), resourceId);
+                if (itemPath.Length == 0)
+                {
+                    return resource.ToResponse();
+                }
+                else
+                {
+                    IApiItem item = resource.GetItemAtPath(itemPath) ?? throw new ApiResourceItemNotFoundException(typeof(T), string.Join(".", itemPath));
+                    return item.ToResponse();
+                }
             });
 
-            server.RegisterHandler(_endpointGetResourceItem, async (ApiRequest request) =>
+            // To create a new resource
+            server.RegisterHandler(_endpointCreateResource, async (ApiRequest request) =>
             {
-                await CheckRequest(request);
+                throw new NotImplementedException();
+            });
 
-                string requestId = request.Arguments[0];
-                string itemName = request.Arguments[1];
+            // To update an existing resource
+            server.RegisterHandler(_endpointUpdateResource, async (ApiRequest request) =>
+            {
+                throw new NotImplementedException();
+            });
 
-                T? resource = await GetResource(requestId) ?? throw new ApiResourceNotFoundException(typeof(T), requestId);
-                ApiItem? resourceItem = resource[itemName] ?? throw new ApiResourceItemNotFoundException(typeof(T), requestId);
-                
-                return resourceItem.ToResponse();
+            // To delete an existing resource
+            server.RegisterHandler(_endpointDeleteResource, async (ApiRequest request) =>
+            {
+                throw new NotImplementedException();
             });
         }
 
         protected abstract Task CheckRequest(ApiRequest request);
 
-        protected abstract Task<ApiResourceEnumerable<T>> GetAllResources();
+        protected abstract Task<ApiResourceEnumerable<T>> QueryResources(NameValueCollection queryParams);
 
-        protected abstract Task<T?> GetResource(string resourceId);
+        protected abstract Task<T?> SelectResource(string resourceId);
 
-        protected abstract Task CreateResource(T resource);
+        protected abstract Task<bool> CreateResource(T resource);
         
-        protected abstract Task UpdateResource(T resource);
+        protected abstract Task<bool> UpdateResource(T resource);
+
+        protected abstract Task<bool> DeleteResource(T resource);
     }
 }
