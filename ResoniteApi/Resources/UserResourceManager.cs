@@ -28,8 +28,7 @@ namespace ResoniteApi.Resources
 
         protected override async Task<ApiResourceEnumerable<UserResource>> QueryResources(NameValueCollection queryParams)
         {
-            string searchName = queryParams.Get("searchName") ?? throw new ArgumentException("Missing required query parameter 'searchName'");
-            queryParams.Remove("searchName");
+            string searchName = queryParams.PopJsonParam<string>("searchName") ?? throw new ArgumentException("Query params missing required query parameter 'searchName'."); ;
 
             IEnumerable<SkyFrost.Base.User> skyFrostUsers = (await Cloud.Users.GetUsers(searchName)).Entity;
 
@@ -45,21 +44,6 @@ namespace ResoniteApi.Resources
             }
 
             return null;
-        }
-
-        protected override async Task<bool> CreateResource(UserResource resource)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override async Task<bool> UpdateResource(UserResource resource)
-        {
-            throw new NotImplementedException();
-        }
-
-        protected override async Task<bool> DeleteResource(UserResource resource)
-        {
-            throw new NotImplementedException();
         }
     }
 }

@@ -9,6 +9,7 @@ namespace ApiFramework.Resources
 {
     public abstract class ApiResourceManager<T> where T : ApiResource
     {
+        private readonly Uri _baseRoute;
         private readonly ApiServer _server;
         private readonly ApiEndpoint _endpointQueryResources;
         private readonly ApiEndpoint _endpointSelectResource;
@@ -22,19 +23,20 @@ namespace ApiFramework.Resources
 
         public ApiResourceManager(ApiServer server, Uri baseRoute)
         {
+            _baseRoute = baseRoute;
             _server = server;
             _endpointQueryResources = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/"));
             _endpointSelectResource = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
-            _endpointCreateResource = new ApiEndpoint("POST",   Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
+            _endpointCreateResource = new ApiEndpoint("POST",   Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/"));
             _endpointUpdateResource = new ApiEndpoint("PATCH",  Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
-            _endpointDeleteResource = new ApiEndpoint("DELETE", Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}"));
+            _endpointDeleteResource = new ApiEndpoint("DELETE", Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/"));
 
             // To query for resources based on query params
             server.RegisterHandler(_endpointQueryResources, async (ApiRequest request) =>
             {
                 await CheckRequest(request);
 
-                ApiResourceEnumerable<T> resources = await QueryResources(request.QueryParams); // (await GetAllResources()).FilterByQueryParams(request.QueryParams);
+                ApiResourceEnumerable<T> resources = await QueryResources(request.QueryParams);
 
                 return resources.ToResponse();
             });
@@ -78,16 +80,31 @@ namespace ApiFramework.Resources
             });
         }
 
-        protected abstract Task CheckRequest(ApiRequest request);
+        protected virtual async Task CheckRequest(ApiRequest request) { }
 
-        protected abstract Task<ApiResourceEnumerable<T>> QueryResources(NameValueCollection queryParams);
+        protected virtual async Task<ApiResourceEnumerable<T>> QueryResources(NameValueCollection queryParams)
+        {
+            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Query");
+        }
 
-        protected abstract Task<T?> SelectResource(string resourceId);
+        protected virtual async Task<T?> SelectResource(string resourceId)
+        {
+            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Select");
+        }
 
-        protected abstract Task<bool> CreateResource(T resource);
-        
-        protected abstract Task<bool> UpdateResource(T resource);
+        protected virtual async Task<bool> CreateResource(T resource)
+        {
+            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Create");
+        }
 
-        protected abstract Task<bool> DeleteResource(T resource);
+        protected virtual async Task<bool> UpdateResource(T resource)
+        {
+            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Update");
+        }
+
+        protected virtual async Task<bool> DeleteResource(T resource)
+        {
+            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Delete");
+        }
     }
 }

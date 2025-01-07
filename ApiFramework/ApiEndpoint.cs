@@ -100,7 +100,7 @@ namespace ApiFramework
 
         public override string ToString()
         {
-            return $"{_httpMethod} -> '{_route}'";
+            return $"{_httpMethod} {_route}";
         }
     }
 }

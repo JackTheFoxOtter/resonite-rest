@@ -1,4 +1,8 @@
-﻿using System;
+﻿using ApiFramework.Exceptions;
+using Elements.Core;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Specialized;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,11 +12,43 @@ namespace ApiFramework
     public static class Utils
     {
         /// <summary>
+        /// Parses a query parameter value as JSON, returns it and removes it from the query parameters.
+        /// </summary>
+        /// <typeparam name="T">Target type of desired parameter</typeparam>
+        /// <param name="queryParams">Query parameters</param>
+        /// <param name="paramName">Name fo desired parameter</param>
+        /// <returns>The parsed parameter value in the target type</returns>
+        /// <exception cref="ArgumentException"></exception>
+        public static T? PopJsonParam<T>(this NameValueCollection queryParams, string paramName)
+        {
+            T? paramValue = default;
+
+            if (queryParams.AllKeys.Contains(paramName))
+            {
+                string paramValueJson = queryParams.Get("searchName");
+                queryParams.Remove(paramName);
+
+                try
+                {
+                    paramValue = JsonConvert.DeserializeObject<T>(paramValueJson);
+                }
+                catch (JsonReaderException ex)
+                {
+                    UniLog.Error(ex.Message, true);
+                    throw new ApiJsonParsingException($"Failed to parse query parameter '{paramName}'. (Expected JSON-formatted {typeof(T)} value)");
+                }
+
+            }
+            
+            return paramValue;
+        }
+
+        /// <summary>
         /// Helper function to retrieve the path segments of a relative Uri, by converting it to a 'fake' absolute Uri first.
         /// </summary>
-        /// <param name="relativeUri">Relative Uri to retrieve path segments from.</param>
-        /// <returns>Array of path segment strings.</returns>
-        internal static string[] GetRelativeUriPathSegments(Uri relativeUri)
+        /// <param name="relativeUri">Relative Uri to retrieve path segments from</param>
+        /// <returns>Array of path segment strings</returns>
+        public static string[] GetRelativeUriPathSegments(Uri relativeUri)
         {
             Uri fakeRoot = new("http://host", UriKind.Absolute);
             Uri fakeRooted = new(fakeRoot, relativeUri);
@@ -28,7 +64,7 @@ namespace ApiFramework
         /// </summary>
         /// <param name="segments">Segments to join</param>
         /// <returns>Joined Uri instance</returns>
-        internal static Uri JoinUriSegments(params string[] segments)
+        public static Uri JoinUriSegments(params string[] segments)
         {
             UriBuilder builder = new();
             foreach (string segment in segments)
@@ -44,8 +80,8 @@ namespace ApiFramework
         /// Checks for both unescaped and URI-escaped variants.
         /// </summary>
         /// <param name="segment">Segment string to check (usually segment of request URI)</param>
-        /// <returns>True if the segment follows the placeholder syntax.</returns>
-        internal static bool IsPlaceholder(string segment)
+        /// <returns>True if the segment follows the placeholder syntax</returns>
+        public static bool IsPlaceholder(string segment)
         {
             return (segment.StartsWith("{") || segment.StartsWith("%7B")) && (segment.EndsWith("}") || segment.EndsWith("%7D"));
         }
@@ -55,8 +91,8 @@ namespace ApiFramework
         /// Checks for both unescaped and URI-escaped variants.
         /// </summary>
         /// <param name="segment">Segment string to check (usually segment of request URI)</param>
-        /// <returns>True if the segment follows the 'greedy placeholder' syntax.</returns>
-        internal static bool IsGreedyPlaceholder(string segment)
+        /// <returns>True if the segment follows the 'greedy placeholder' syntax</returns>
+        public static bool IsGreedyPlaceholder(string segment)
         {
             return segment.Equals("{...}") || segment.Equals("%7B...%7D");
         }

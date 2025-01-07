@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-
-namespace ApiFramework.Exceptions
+﻿namespace ApiFramework.Exceptions
 {
     public class ApiResourceItemReadOnlyException : ApiException
     {
