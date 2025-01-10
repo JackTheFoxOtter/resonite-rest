@@ -1,4 +1,5 @@
 ﻿using ApiFramework;
+using ApiFramework.Exceptions;
 using ApiFramework.Resources;
 using FrooxEngine;
 using System.Collections.Specialized;
@@ -28,7 +29,7 @@ namespace ResoniteApi.Resources
 
         protected override async Task<ApiResourceEnumerable<UserResource>> QueryResources(NameValueCollection queryParams)
         {
-            string searchName = queryParams.PopJsonParam<string>("searchName") ?? throw new ArgumentException("Query params missing required query parameter 'searchName'."); ;
+            string searchName = queryParams.PopJsonParam<string>("searchName") ?? throw new ApiMissingQueryParameterException("searchName");
 
             IEnumerable<SkyFrost.Base.User> skyFrostUsers = (await Cloud.Users.GetUsers(searchName)).Entity;
 

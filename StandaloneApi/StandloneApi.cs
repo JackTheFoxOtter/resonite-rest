@@ -1,8 +1,7 @@
 ﻿using ApiFramework;
 using Newtonsoft.Json;
-using ResoniteApi.Resources;
 
-ApiServer server = new ApiServer();
+ApiServer server = new ApiServer("ResoniteApi");
 
 server.RegisterHandler(new ApiEndpoint("GET", "ping"), async (ApiRequest request) =>
 {
@@ -18,15 +17,14 @@ server.RegisterHandler(new ApiEndpoint("GET", "version"), async (ApiRequest requ
     return new ApiResponse(200, JsonConvert.SerializeObject(version));
 });
 
-DummyContactResourceManager dummyContactManager = new(server, "contacts");
+//DummyContactResourceManager dummyContactManager = new(server, "contacts");
 
 Task.WaitAll(Task.Run(async () =>
-{ 
-    server.Start(4600);
+{
+    await server.Start("+", 4600);
 
-    while(true)
+    while (true)
     {
         await Task.Delay(1);
     }
 }));
-

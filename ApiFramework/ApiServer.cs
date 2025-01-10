@@ -16,16 +16,14 @@ namespace ApiFramework
     public class ApiServer
     {
         private readonly Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> _handlers = new();
-        private readonly HttpListener _listener;
-        private bool _isRunning;
+        private string _baseRoute;
+        private bool _isRunning = false;
 
-        private int? _port;
-        private Uri? _baseUri;
-        CancellationTokenSource? _listenerCancellationTokenSource;
-        Task? _listenerTask;
+        private CancellationTokenSource? _listenerCancellationTokenSource;
+        private HttpListener? _listener;
+        private Task? _listenerTask;
 
         public bool IsRunning => _isRunning;
-        public int? Port => _port;
 
         public void RegisterHandler(ApiEndpoint endpoint, Func<ApiRequest, Task<ApiResponse>> handler)
         {
@@ -81,10 +79,16 @@ namespace ApiFramework
             context.Response.Close();
         }
 
-        public ApiServer()
+        public ApiServer(string? baseRoute)
         {
-            _listener = new HttpListener();
-            _isRunning = false;
+            if (baseRoute != null && !string.IsNullOrEmpty(baseRoute))
+            {
+                _baseRoute = baseRoute.Trim('/');
+            }
+            else
+            {
+                _baseRoute = "";
+            }
 
             // Register default root handler.
             RegisterHandler(new ApiEndpoint("GET", ""), async (ApiRequest request) =>
@@ -94,30 +98,44 @@ namespace ApiFramework
             });
         }
 
-        public void Start(int port)
+        public async Task Start(string host, int port)
         {
-            UniLog.Log($"[ResoniteApi] Starting API server for port {port}...");
-            if (_isRunning)
+            if (_isRunning) throw new ApplicationException("API server is already running!");
+
+            UniLog.Log($"[ResoniteApi] Starting API server...");
+
+            string uriPrefix = $"http://{host}:{port}/{_baseRoute}/";
+            try
             {
-                throw new ApplicationException("API server is already running!");
+                // Attempt to start the listener
+                StartInternal(uriPrefix);
             }
+            catch (HttpListenerException e)
+            {
+                if (e.ErrorCode != 5) throw;
+                
+                // Access denied, this indicates that the requested URI can't be listened on (probably because it's a wildcard one)
+                // Add URI to HTTP access control list for current user and retry.
+                UniLog.Log("[ResoniteApi] Access denied, requesting to add URI prefix to HTTP access control list...");
+                await Utils.AddAclAddress(uriPrefix);
+                StartInternal(uriPrefix);
+            }
+        }
 
-            _port = port;
-            _baseUri = new Uri($"http://localhost:{port}/ResoniteApi/", UriKind.Absolute);
-            UniLog.Log($"[ResoniteApi] ApiServer: Setting handler base URI to '{_baseUri}'");
-
-            // Update prefixes.
-            _listener.Prefixes.Clear();
-            _listener.Prefixes.Add(_baseUri.ToString());
-
-            // Start listener.
-            _listener.Start();
+        private void StartInternal(string uriPrefix)
+        {
             _listenerCancellationTokenSource = new CancellationTokenSource();
-            _listenerTask = Task.Run(async () => { 
+            _listener = new HttpListener();
+            _listener.Prefixes.Add(uriPrefix);
+
+            _listener.Start();
+            _listenerTask = Task.Run(async () => {
                 await HandleRequests(_listenerCancellationTokenSource.Token);
             }, _listenerCancellationTokenSource.Token);
 
             _isRunning = true;
+            
+            UniLog.Log($"[ResoniteApi] Listening on: {uriPrefix}");
         }
 
         public void Stop()
@@ -129,40 +147,38 @@ namespace ApiFramework
             }
 
             // Stop listener.
-            _listener.Stop();
+            StopInternal();
+        }
+
+        private void StopInternal()
+        {
+            _listener?.Stop();
             _listenerCancellationTokenSource?.Cancel();
             _listenerTask?.Wait();
 
-            _port = null;
-            _baseUri = null;
             _listenerCancellationTokenSource = null;
+            _listener = null;
             _listenerTask = null;
-
             _isRunning = false;
         }
         
         async private Task HandleRequests(CancellationToken cancellationToken)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested && _listener != null)
             {
                 try
                 {
                     HttpListenerContext context = await _listener.GetContextAsync().WrapCancellable(cancellationToken);
-                    UniLog.Log($"[ResoniteApi] Received request: {context.Request.Url}, UserAgent: {context.Request.UserAgent}");
+                    UniLog.Log($"[ResoniteApi] Received request: '{context.Request.HttpMethod} {context.Request.Url}', UserAgent: '{context.Request.UserAgent}'");
 
                     ApiResponse? response = null;
                     try
                     {
-                        // Ensure base Uri is defined
+                        // Determine API route of request
                         string httpMethod = context.Request.HttpMethod;
-                        Uri baseUri = _baseUri ?? throw new ArgumentNullException(nameof(_baseUri));
-
-                        // Ensure the request Uri ends with a trailing slash before computing relative route Uri (otherwise it doesn't behave as expected)
-                        string requestUriString = context.Request.Url.GetComponents(UriComponents.AbsoluteUri, UriFormat.UriEscaped);
-                        Uri requestUri = requestUriString.EndsWith("/") ? new(requestUriString, UriKind.Absolute) : new(requestUriString + "/", UriKind.Absolute);
-
-                        // Compute API route (relative Uri from base to request)
-                        Uri apiRoute = baseUri.MakeRelativeUri(requestUri);
+                        string requestPath = context.Request.Url.AbsolutePath.Trim('/');
+                        if (requestPath.StartsWith(_baseRoute)) requestPath = requestPath.Remove(0, _baseRoute.Length);
+                        Uri apiRoute = new(requestPath, UriKind.Relative);
 
                         ApiEndpoint? endpoint = FindBestMatchingEndpoint(httpMethod, apiRoute);
                         if (endpoint != null)

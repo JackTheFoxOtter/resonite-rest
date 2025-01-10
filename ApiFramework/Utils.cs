@@ -3,6 +3,7 @@ using Elements.Core;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,6 +143,37 @@ namespace ApiFramework
             );
 
             return tcs.Task;
+        }
+
+        /// <summary>
+        /// For using wildcard HTTP listener on Windows, the listener address needs to be added to the HTTP access control list (acl).
+        /// Attention: This opens a UAC dialog, when the address isn't already allowed!
+        /// </summary>
+        /// <param name="address">Target address to add to the acl list</param>
+        public static async Task AddAclAddress(string address)
+        {
+            string args = string.Format(@"http add urlacl url={0} user={1}\{2}", address, Environment.UserDomainName, Environment.UserName);
+
+            ProcessStartInfo psi = new ProcessStartInfo("netsh", args);
+            psi.Verb = "runas";
+            psi.CreateNoWindow = true;
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.UseShellExecute = true;
+
+            await Process.Start(psi).WaitForExitAsync();
+        }
+
+        /// <summary>
+        /// Wait for a process to exit asynchronously.
+        /// </summary>
+        /// <param name="process"></param>
+        /// <returns></returns>
+        public static async Task WaitForExitAsync(this Process process)
+        {
+            while (!process.HasExited)
+            {
+                await Task.Yield();
+            }
         }
     }
 }
