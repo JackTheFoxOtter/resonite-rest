@@ -1,6 +1,6 @@
 ﻿using SkyFrost.Base;
 
-namespace ResoniteApi.Resources
+namespace ResoniteApi.Resources.Contacts
 {
     internal class ContactResource : SkyFrostApiResourceWrapper<Contact>
     {

@@ -4,7 +4,7 @@ using ApiFramework.Resources;
 using FrooxEngine;
 using System.Collections.Specialized;
 
-namespace ResoniteApi.Resources
+namespace ResoniteApi.Resources.Users
 {
     internal class UserResourceManager : ApiResourceManager<UserResource>
     {
@@ -13,11 +13,6 @@ namespace ResoniteApi.Resources
         public EngineSkyFrostInterface Cloud => _cloud;
 
         public UserResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
-        {
-            _cloud = cloud;
-        }
-
-        public UserResourceManager(ApiServer server, Uri baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
         {
             _cloud = cloud;
         }

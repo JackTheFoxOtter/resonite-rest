@@ -26,7 +26,7 @@ namespace ApiFramework
 
             if (queryParams.AllKeys.Contains(paramName))
             {
-                string paramValueJson = queryParams.Get("searchName");
+                string paramValueJson = queryParams.Get(paramName);
                 queryParams.Remove(paramName);
 
                 try
@@ -55,25 +55,7 @@ namespace ApiFramework
             Uri fakeRooted = new(fakeRoot, relativeUri);
             string[] segments = (from segment in fakeRooted.Segments select segment.TrimEnd('/')).ToArray();
 
-            string segmentsStr = string.Join(", ", segments);
-
             return segments;
-        }
-
-        /// <summary>
-        /// Helper function to join string Uri segments into a Uri instance.
-        /// </summary>
-        /// <param name="segments">Segments to join</param>
-        /// <returns>Joined Uri instance</returns>
-        public static Uri JoinUriSegments(params string[] segments)
-        {
-            UriBuilder builder = new();
-            foreach (string segment in segments)
-            {
-                builder.Path += segment;
-            }
-
-            return builder.Uri;
         }
 
         /// <summary>
@@ -147,18 +129,20 @@ namespace ApiFramework
 
         /// <summary>
         /// For using wildcard HTTP listener on Windows, the listener address needs to be added to the HTTP access control list (acl).
-        /// Attention: This opens a UAC dialog, when the address isn't already allowed!
+        /// Attention: This opens a UAC dialog when the address isn't already allowed!
         /// </summary>
         /// <param name="address">Target address to add to the acl list</param>
         public static async Task AddAclAddress(string address)
         {
             string args = string.Format(@"http add urlacl url={0} user={1}\{2}", address, Environment.UserDomainName, Environment.UserName);
 
-            ProcessStartInfo psi = new ProcessStartInfo("netsh", args);
-            psi.Verb = "runas";
-            psi.CreateNoWindow = true;
-            psi.WindowStyle = ProcessWindowStyle.Hidden;
-            psi.UseShellExecute = true;
+            ProcessStartInfo psi = new("netsh", args)
+            {
+                Verb = "runas",
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                UseShellExecute = true
+            };
 
             await Process.Start(psi).WaitForExitAsync();
         }
@@ -170,10 +154,12 @@ namespace ApiFramework
         /// <returns></returns>
         public static async Task WaitForExitAsync(this Process process)
         {
-            while (!process.HasExited)
-            {
-                await Task.Yield();
-            }
+            TaskCompletionSource<bool> completion = new();
+
+            process.Exited += (object sender, EventArgs e) => completion.SetResult(true);
+            if (process.HasExited) completion.TrySetResult(true); // In case it exited before the event handler was registered
+
+            await completion.Task;
         }
     }
 }

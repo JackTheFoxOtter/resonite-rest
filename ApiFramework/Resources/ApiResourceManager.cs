@@ -9,7 +9,7 @@ namespace ApiFramework.Resources
 {
     public abstract class ApiResourceManager<T> where T : ApiResource
     {
-        private readonly Uri _baseRoute;
+        private readonly string _baseRoute;
         private readonly ApiServer _server;
         private readonly ApiEndpoint _endpointQueryResources;
         private readonly ApiEndpoint _endpointSelectResource;
@@ -19,17 +19,15 @@ namespace ApiFramework.Resources
 
         public ApiServer Server => _server;
 
-        public ApiResourceManager(ApiServer server, string baseRoute) : this(server, new Uri(baseRoute, UriKind.Relative)) { }
-
-        public ApiResourceManager(ApiServer server, Uri baseRoute)
+        public ApiResourceManager(ApiServer server, string baseRoute)
         {
-            _baseRoute = baseRoute;
+            _baseRoute = baseRoute.Trim('/');
             _server = server;
-            _endpointQueryResources = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/"));
-            _endpointSelectResource = new ApiEndpoint("GET",    Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
-            _endpointCreateResource = new ApiEndpoint("POST",   Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/"));
-            _endpointUpdateResource = new ApiEndpoint("PATCH",  Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/{...}/"));
-            _endpointDeleteResource = new ApiEndpoint("DELETE", Utils.JoinUriSegments(baseRoute.ToString(), "/{resourceId}/"));
+            _endpointQueryResources = new ApiEndpoint("GET",    new Uri(_baseRoute + "/",                    UriKind.Relative));
+            _endpointSelectResource = new ApiEndpoint("GET",    new Uri(_baseRoute + "/{resourceId}/{...}/", UriKind.Relative));
+            _endpointCreateResource = new ApiEndpoint("POST",   new Uri(_baseRoute + "/{resourceId}/",       UriKind.Relative));
+            _endpointUpdateResource = new ApiEndpoint("PATCH",  new Uri(_baseRoute + "/{resourceId}/{...}/", UriKind.Relative));
+            _endpointDeleteResource = new ApiEndpoint("DELETE", new Uri(_baseRoute + "/{resourceId}/",       UriKind.Relative));
 
             // To query for resources based on query params
             server.RegisterHandler(_endpointQueryResources, async (ApiRequest request) =>
@@ -84,27 +82,27 @@ namespace ApiFramework.Resources
 
         protected virtual async Task<ApiResourceEnumerable<T>> QueryResources(NameValueCollection queryParams)
         {
-            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Query");
+            throw new ApiMethodNotSupportedException(_baseRoute, "Query");
         }
 
         protected virtual async Task<T?> SelectResource(string resourceId)
         {
-            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Select");
+            throw new ApiMethodNotSupportedException(_baseRoute, "Select");
         }
 
         protected virtual async Task<bool> CreateResource(T resource)
         {
-            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Create");
+            throw new ApiMethodNotSupportedException(_baseRoute, "Create");
         }
 
         protected virtual async Task<bool> UpdateResource(T resource)
         {
-            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Update");
+            throw new ApiMethodNotSupportedException(_baseRoute, "Update");
         }
 
         protected virtual async Task<bool> DeleteResource(T resource)
         {
-            throw new ApiMethodNotSupportedException(_baseRoute.ToString(), "Delete");
+            throw new ApiMethodNotSupportedException(_baseRoute, "Delete");
         }
     }
 }

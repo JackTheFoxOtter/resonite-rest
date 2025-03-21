@@ -4,7 +4,7 @@ using FrooxEngine;
 using SkyFrost.Base;
 using System.Collections.Specialized;
 
-namespace ResoniteApi.Resources
+namespace ResoniteApi.Resources.Contacts
 {
     internal class ContactResourceManager : ApiResourceManager<ContactResource>
     {
@@ -13,11 +13,6 @@ namespace ResoniteApi.Resources
         public EngineSkyFrostInterface Cloud => _cloud;
 
         public ContactResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
-        {
-            _cloud = cloud;
-        }
-
-        public ContactResourceManager(ApiServer server, Uri baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
         {
             _cloud = cloud;
         }

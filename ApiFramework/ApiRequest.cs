@@ -1,5 +1,8 @@
 ﻿using System.Collections.Specialized;
+using System.IO;
+
 using System.Net;
+using System.Threading.Tasks;
 
 namespace ApiFramework
 {
@@ -19,5 +22,18 @@ namespace ApiFramework
         public HttpListenerContext Context => _context;
         public string[] Arguments => _arguments;
         public NameValueCollection QueryParams => _queryParams;
+
+        public async Task<string?> GetBody()
+        {
+            if (!_context.Request.HasEntityBody) return null;
+
+            using (Stream body = _context.Request.InputStream)
+            {
+                using (var reader = new StreamReader(body, _context.Request.ContentEncoding))
+                {
+                    return await reader.ReadToEndAsync();
+                }
+            }
+        }
     }
 }

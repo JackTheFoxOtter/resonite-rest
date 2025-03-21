@@ -2,7 +2,7 @@
 
 namespace ApiFramework.Exceptions
 {
-    internal class ApiResourceNotFoundException : ApiException
+    public class ApiResourceNotFoundException : ApiException
     {
         private readonly Type _resourceType;
         private readonly string _resourceId;

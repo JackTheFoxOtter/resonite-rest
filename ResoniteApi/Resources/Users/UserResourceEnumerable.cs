@@ -1,7 +1,7 @@
 ﻿using ApiFramework;
 using SkyFrost.Base;
 
-namespace ResoniteApi.Resources
+namespace ResoniteApi.Resources.Users
 {
     internal class UserResourceEnumerable : ApiResourceEnumerable<UserResource>
     {

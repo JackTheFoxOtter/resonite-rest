@@ -1,7 +1,9 @@
 ﻿using ApiFramework;
 using FrooxEngine;
 using Newtonsoft.Json;
-using ResoniteApi.Resources;
+using ResoniteApi.Resources.CloudVariables;
+using ResoniteApi.Resources.Contacts;
+using ResoniteApi.Resources.Users;
 
 namespace ResoniteApi
 {
@@ -48,6 +50,7 @@ namespace ResoniteApi
 
             ContactResourceManager contactManager = new(_apiServer, "contacts", Cloud);
             UserResourceManager userManager = new(_apiServer, "users", Cloud);
+            CloudVariableResourceManager variableManager = new(_apiServer, "variables", Cloud);
 
             if (Port.Value > 0 && !string.IsNullOrEmpty(Host.Value))
             {

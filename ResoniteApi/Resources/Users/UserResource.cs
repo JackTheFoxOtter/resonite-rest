@@ -1,6 +1,6 @@
 ﻿using SkyFrost.Base;
 
-namespace ResoniteApi.Resources
+namespace ResoniteApi.Resources.Users
 {
     internal class UserResource : SkyFrostApiResourceWrapper<User>
     {
