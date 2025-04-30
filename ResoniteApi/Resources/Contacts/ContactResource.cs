@@ -6,8 +6,6 @@ namespace ResoniteApi.Resources.Contacts
     {
         private static string[] _editableItems =
         {
-            "id",
-            "contactUsername",
             "contactStatus"
         };
 

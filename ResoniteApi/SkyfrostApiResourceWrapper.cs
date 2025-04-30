@@ -1,11 +1,16 @@
 ﻿using ApiFramework.Resources;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace ResoniteApi
 {
     internal abstract class SkyFrostApiResourceWrapper<T> : ApiResource
     {
         public SkyFrostApiResourceWrapper(T skyFrostResource) : base(ToJson(skyFrostResource)) { }
+
+        public SkyFrostApiResourceWrapper(JToken json) : base(json) { }
+
+        public SkyFrostApiResourceWrapper(string json) : base(json) { }
 
         public T? SkyFrostResource
         {

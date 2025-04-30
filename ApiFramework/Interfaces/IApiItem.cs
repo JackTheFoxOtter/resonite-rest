@@ -9,5 +9,7 @@ namespace ApiFramework.Interfaces
         public JToken ToJsonRepresentation();
         public string ToJson();
         public ApiResponse ToResponse();
+        public IApiItem CreateCopy(IApiItemContainer container, bool canEdit);
+        public void UpdateFrom(IApiItem other);
     }
 }

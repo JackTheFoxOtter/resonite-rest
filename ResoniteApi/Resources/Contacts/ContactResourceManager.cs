@@ -1,4 +1,6 @@
 ﻿using ApiFramework;
+using ApiFramework.Enums;
+using ApiFramework.Exceptions;
 using ApiFramework.Resources;
 using FrooxEngine;
 using SkyFrost.Base;
@@ -12,7 +14,7 @@ namespace ResoniteApi.Resources.Contacts
 
         public EngineSkyFrostInterface Cloud => _cloud;
 
-        public ContactResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
+        public ContactResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri, (byte)ResourceMethod.All)
         {
             _cloud = cloud;
         }
@@ -40,14 +42,19 @@ namespace ResoniteApi.Resources.Contacts
             return null;
         }
 
-        protected override async Task<bool> CreateResource(ContactResource resource)
+        protected override async Task<string?> CreateResource(ContactResource contact)
         {
-            throw new NotImplementedException();
-            //Contact skyFrostContact = resource.SkyFrostResource;
-            //return await Cloud.Contacts.AddContact(skyFrostContact);
+            string contactUserId = contact.GetItemAtPath<ApiItemValue<string>>("id")?.Value ?? throw new ApiMissingRequiredArgumentException("id");
+            
+            if (await Cloud.Contacts.AddContact(contactUserId, string.Empty))
+            {
+                return contactUserId;
+            }
+
+            return null;
         }
 
-        protected override async Task<bool> UpdateResource(ContactResource resource)
+        protected override async Task<bool> UpdateResource(ContactResource contact)
         {
             throw new NotImplementedException();
             //Contact skyFrostContact = resource.SkyFrostResource;

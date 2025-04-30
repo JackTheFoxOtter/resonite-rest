@@ -1,4 +1,5 @@
 ﻿using ApiFramework;
+using ApiFramework.Enums;
 using ApiFramework.Exceptions;
 using ApiFramework.Resources;
 using FrooxEngine;
@@ -12,7 +13,7 @@ namespace ResoniteApi.Resources.Users
 
         public EngineSkyFrostInterface Cloud => _cloud;
 
-        public UserResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri)
+        public UserResourceManager(ApiServer server, string baseUri, EngineSkyFrostInterface cloud) : base(server, baseUri, (byte)ResourceMethod.Query | (byte)ResourceMethod.Select)
         {
             _cloud = cloud;
         }

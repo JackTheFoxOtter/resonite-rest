@@ -92,18 +92,15 @@ namespace ResoniteApi.Resources.CloudVariables
                 string path = $"{definitionOwnerId}.{subPath}";
                 if (!CloudVariableHelper.IsValidPath(path)) throw new ApiInvalidCloudVariablePathException(path);
 
+
+
                 CloudVariableProxy proxy = _cloud.Variables.RequestProxy(variableOwnerId, path);
                 await proxy.Refresh();
                 if (proxy.State is CloudVariableState.Invalid or CloudVariableState.Unregistered)
                     throw new ApiInvalidCloudVariableProxyException();
 
                 var value = proxy.ReadValue<object>();
-
-                // TODO: Use proxy for read? The problem is that we can't access the raw api resource through it...
-                CloudVariable skyFrostVariable = (await _cloud.Variables.Get(variableOwnerId, path)).Entity
-                    ?? throw new ApiResourceNotFoundException(typeof(CloudVariableResource), $"{path}:{variableOwnerId}");
-
-                CloudVariableResource variable = new(skyFrostVariable);
+                CloudVariableResource variable = CloudVariableResource.FromPartial(variableOwnerId, path, value, null);
 
                 return variable.ToResponse();
             });

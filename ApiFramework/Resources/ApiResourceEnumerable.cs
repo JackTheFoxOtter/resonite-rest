@@ -46,21 +46,27 @@ namespace ApiFramework
                 return (ApiResourceEnumerable<T>) Activator.CreateInstance(GetType(), new object[] { this });
             }
 
+            List<Tuple<string, JValueFilter>> filters = new();
+            foreach (string? argumentName in queryParams.Keys)
+            {
+                if (argumentName == null) continue;
+                if (string.IsNullOrEmpty(argumentName)) continue;
+
+                filters.Add(new(argumentName, JValueFilter.FromQueryParamValue(queryParams[argumentName])));
+            }
+
             IEnumerable<T> filtered = this.AsParallel().Where((T resource) =>
             {
-                foreach (string? argumentName in queryParams.Keys)
+                
+                foreach ((string argumentName, JValueFilter filter) in filters)
                 {
-                    if (argumentName == null) continue;
-
                     IApiItem? resourceItem = resource.GetItemAtPath(argumentName.Split('.'));
                     if (resourceItem == null)
                     {
                         return false;
                     }
 
-                    string resourceValue = resourceItem.ToJson();
-                    string comparisonValue = queryParams[argumentName];
-                    if (!resourceValue.Equals(comparisonValue, StringComparison.InvariantCulture))
+                    if (!filter.Check((JValue) resourceItem.ToJsonRepresentation()))
                     {
                         return false;
                     }

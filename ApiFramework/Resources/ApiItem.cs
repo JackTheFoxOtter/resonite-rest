@@ -32,6 +32,10 @@ namespace ApiFramework.Resources
 
         public abstract JToken ToJsonRepresentation();
 
+        public abstract IApiItem CreateCopy(IApiItemContainer container, bool canEdit);
+
+        public abstract void UpdateFrom(IApiItem other);
+
         public string ToJson()
         {
             return JsonConvert.SerializeObject(ToJsonRepresentation());
@@ -71,7 +75,7 @@ namespace ApiFramework.Resources
                     {
                         if (kv.Value != null)
                         {
-                            dict.Insert(kv.Key, FromJson(dict, canEditCheck, kv.Value, itemPath.Append(kv.Key).ToArray()));
+                            dict.Insert(kv.Key, FromJson(dict, canEditCheck, kv.Value, itemPath.Append(kv.Key).ToArray()), false);
                         }
                     }
                     return dict;
@@ -81,7 +85,7 @@ namespace ApiFramework.Resources
                     for (int i = 0; i < ((JArray) token).Count; i++)
                     {
                         JToken childToken = ((JArray) token)[i];
-                        list.Insert(FromJson(list, canEditCheck, childToken, itemPath.Append(i.ToString()).ToArray()));
+                        list.Insert(FromJson(list, canEditCheck, childToken, itemPath.Append(i.ToString()).ToArray()), false);
                     }
                     return list;
 

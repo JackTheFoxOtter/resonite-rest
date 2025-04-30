@@ -23,13 +23,13 @@ namespace ApiFramework.Resources
             _canEdit = rootItem.CanEdit();
         }
 
-        public ApiResource(string json)
+        public ApiResource(JToken json)
         {
             _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
             _canEdit = _rootItem.CanEdit();
         }
 
-        public ApiResource(JToken json)
+        public ApiResource(string json)
         {
             _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
             _canEdit = _rootItem.CanEdit();
@@ -50,7 +50,7 @@ namespace ApiFramework.Resources
             return item == _rootItem;
         }
 
-        public IApiItem? GetItemAtPath(string[] itemPath)
+        public IApiItem? GetItemAtPath(params string[] itemPath)
         {
             IApiItem? item = RootItem;
             foreach (string pathSegment in itemPath)
@@ -80,6 +80,15 @@ namespace ApiFramework.Resources
             }
 
             return item;
+        }
+
+        public T? GetItemAtPath<T>(params string[] itemPath) where T: IApiItem
+        {
+            IApiItem? item = GetItemAtPath(itemPath);
+            
+            if (item is T tItem) return tItem;
+            
+            return default;
         }
 
         public bool ContainsItemAtPath(string[] itemPath)
@@ -120,5 +129,13 @@ namespace ApiFramework.Resources
         }
 
         public abstract string GetResourceName();
+
+        public void UpdateFrom(ApiResource other)
+        {
+            if (other == null) throw new ArgumentNullException(nameof(other));
+            if (GetType() != other.GetType()) throw new ArgumentException($"Can't update {GetType()} from resource with different type ({other.GetType()})");
+
+
+        }
     }
 }
