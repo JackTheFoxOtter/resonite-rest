@@ -1,7 +1,7 @@
 ﻿namespace ApiFramework.Exceptions
 {
 
-    internal class ApiMethodNotmplementedException : ApiException
+    public class ApiMethodNotmplementedException : ApiException
     {
         private string _endpointName;
         private string _methodName;

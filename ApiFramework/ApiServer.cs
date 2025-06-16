@@ -31,7 +31,7 @@ namespace ApiFramework
                 throw new ArgumentException($"A handler is already defined for endpoint {endpoint}!");
             }
 
-            UniLog.Log($"[ResoniteApi] Registering handler for endpoint: {endpoint}");
+            UniLog.Log($"[ApiFramework] Registering handler for endpoint: {endpoint}");
             _handlers.Add(endpoint, handler);
         }
 
@@ -39,7 +39,7 @@ namespace ApiFramework
         {
             if (_handlers.ContainsKey(endpoint))
             {
-                UniLog.Log($"[ResoniteApi] Removing handler for endpoint: {endpoint}");
+                UniLog.Log($"[ApiFramework] Removing handler for endpoint: {endpoint}");
                 _handlers.Remove(endpoint);
             }
         }
@@ -102,7 +102,7 @@ namespace ApiFramework
         {
             if (_isRunning) throw new ApplicationException("API server is already running!");
 
-            UniLog.Log($"[ResoniteApi] Starting API server...");
+            UniLog.Log($"[ApiFramework] Starting API server...");
 
             string uriPrefix = $"http://{host}:{port}/{_baseRoute}/";
             try
@@ -116,7 +116,7 @@ namespace ApiFramework
                 
                 // Access denied, this indicates that the requested URI can't be listened on (probably because it's a wildcard one)
                 // Add URI to HTTP access control list for current user and retry.
-                UniLog.Log("[ResoniteApi] Access denied, requesting to add URI prefix to HTTP access control list...");
+                UniLog.Log("[ApiFramework] Access denied, requesting to add URI prefix to HTTP access control list...");
                 await Utils.AddAclAddress(uriPrefix);
                 StartInternal(uriPrefix);
             }
@@ -135,12 +135,12 @@ namespace ApiFramework
 
             _isRunning = true;
             
-            UniLog.Log($"[ResoniteApi] Listening on: {uriPrefix}");
+            UniLog.Log($"[ApiFramework] Listening on: {uriPrefix}");
         }
 
         public void Stop()
         {
-            UniLog.Log($"[ResoniteApi] Stopping API server...");
+            UniLog.Log($"[ApiFramework] Stopping API server...");
             if (!_isRunning)
             {
                 throw new ApplicationException("API server is not running!");
@@ -169,7 +169,7 @@ namespace ApiFramework
                 try
                 {
                     HttpListenerContext context = await _listener.GetContextAsync().WrapCancellable(cancellationToken);
-                    UniLog.Log($"[ResoniteApi] Received request: '{context.Request.HttpMethod} {context.Request.Url}', UserAgent: '{context.Request.UserAgent}'");
+                    UniLog.Log($"[ApiFramework] Received request: '{context.Request.HttpMethod} {context.Request.Url}', UserAgent: '{context.Request.UserAgent}'");
 
                     ApiResponse? response = null;
                     try
@@ -235,7 +235,7 @@ namespace ApiFramework
                 catch (Exception ex)
                 {
                     // Something went wrong.
-                    UniLog.Log($"[ResoniteApi] Exception during handling of request!\n{ex}");
+                    UniLog.Log($"[ApiFramework] Exception during handling of request!\n{ex}");
                 }
             }
         }

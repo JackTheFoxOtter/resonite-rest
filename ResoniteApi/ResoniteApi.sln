@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResoniteApi", "ResoniteApi.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiFramework", "..\ApiFramework\ApiFramework.csproj", "{339F70A4-FE54-47A1-8719-4012FC0A7BFC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExampleApi", "..\ExampleApi\ExampleApi.csproj", "{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

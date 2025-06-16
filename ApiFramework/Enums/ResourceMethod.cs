@@ -8,6 +8,6 @@
         Replace = 0b00001000, // PUT replace existing resource fully, or create a new resource
         Update  = 0b00010000, // PATCH partially update existing resource
         Delete  = 0b00100000, // DELETE existing resource
-        All     = 0b11111111
+        All     = 0b00111111
     }
 }

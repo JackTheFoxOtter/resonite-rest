@@ -18,8 +18,10 @@ namespace ApiFramework.Resources
         private readonly ApiEndpoint _endpointSelectResource;
         private readonly ApiEndpoint _endpointCreateResource;
         private readonly ApiEndpoint _endpointUpdateResource;
+        private readonly ApiEndpoint _endpointReplaceResource;
         private readonly ApiEndpoint _endpointDeleteResource;
 
+        public string BaseRoute => _baseRoute;
         public ApiServer Server => _server;
 
         public ApiResourceManager(ApiServer server, string baseRoute, byte methodFlags)
@@ -55,10 +57,12 @@ namespace ApiFramework.Resources
                     T resource = await SelectResource(resourceId) ?? throw new ApiResourceNotFoundException(typeof(T), resourceId);
                     if (itemPath.Length == 0)
                     {
+                        // Select entire resource
                         return resource.ToResponse();
                     }
                     else
                     {
+                        // Select a sub-element of the resource
                         IApiItem item = resource.GetItemAtPath(itemPath) ?? throw new ApiResourceItemNotFoundException(typeof(T), string.Join(".", itemPath));
                         return item.ToResponse();
                     }
@@ -82,6 +86,21 @@ namespace ApiFramework.Resources
                 });
             }
 
+            //if ((methodFlags & (byte)ResourceMethod.Update) > 0)
+            //{
+            //    // (Partially) update an existing resource
+            //    _endpointUpdateResource = new ApiEndpoint("PATCH", new Uri(_baseRoute + "/{resourceId}/{...}/", UriKind.Relative));
+            //    server.RegisterHandler(_endpointUpdateResource, async (ApiRequest request) =>
+            //    {
+            //        await CheckRequest(request);
+
+            //        string json = await request.GetBody() ?? throw new ApiMissingRequestBodyException();
+            //        T resource = (T)Activator.CreateInstance(typeof(T), json);
+
+
+            //    });
+            //}
+
             if ((methodFlags & (byte)ResourceMethod.Replace) > 0)
             {
                 // Replace an existing resource fully, or create a new resource
@@ -99,14 +118,8 @@ namespace ApiFramework.Resources
                     if (existingResource != null)
                     {
                         // Update existing
-                        if (await UpdateResource(resource))
-                        {
-                            return new ApiResponse(200, JsonConvert.SerializeObject(new JProperty("resourceId", resourceId))); // 200 - OK
-                        }
-                        else
-                        {
-                            throw new ResourceNotUpdatedException(typeof(T), resourceId);
-                        }
+                        if (!await UpdateResource(resource)) throw new ApiResourceNotUpdatedException(typeof(T), resourceId);
+                        return new ApiResponse(200, JsonConvert.SerializeObject(new JProperty("resourceId", resourceId))); // 200 - OK
                     }
                     else
                     {
@@ -114,21 +127,6 @@ namespace ApiFramework.Resources
                         string createdResourceId = await CreateResource(resource) ?? throw new ApiResourceNotCreatedException(typeof(T));
                         return new ApiResponse(201, JsonConvert.SerializeObject(new JProperty("resourceId", createdResourceId))); // 201 - Created
                     }
-                });
-
-            if ((methodFlags & (byte)ResourceMethod.Update) > 0)
-            {
-                // (Partially) update an existing resource
-                _endpointUpdateResource = new ApiEndpoint("PATCH", new Uri(_baseRoute + "/{resourceId}/{...}/", UriKind.Relative));
-                server.RegisterHandler(_endpointUpdateResource, async (ApiRequest request) =>
-                {
-                    await CheckRequest(request);
-
-
-
-                    string json = await request.GetBody() ?? throw new ApiMissingRequestBodyException();
-                    T resource = (T)Activator.CreateInstance(typeof(T), json);
-
                 });
             }
 
@@ -164,6 +162,11 @@ namespace ApiFramework.Resources
         protected virtual async Task<bool> UpdateResource(T resource)
         {
             throw new ApiMethodNotmplementedException(_baseRoute, "Update");
+        }
+
+        protected virtual async Task<bool> ReplaceResource(T resource)
+        {
+            throw new ApiMethodNotmplementedException(_baseRoute, "Replace");
         }
 
         protected virtual async Task<bool> DeleteResource(T resource)
