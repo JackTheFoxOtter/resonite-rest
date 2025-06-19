@@ -13,12 +13,7 @@ namespace ApiFramework
 {
     public abstract class ApiResourceEnumerable<T> : IEnumerable<T> where T : ApiResource
     {
-        protected abstract IEnumerator<T> Enumerator { get; set; } // TODO: Change to { get; init; } once target framework > 5.0
-
-        public ApiResourceEnumerable(IEnumerable<T> enumerable) 
-        {
-            Enumerator = enumerable.GetEnumerator();
-        }
+        public abstract IEnumerator<T> Enumerator { get; }
 
         public IEnumerator<T> GetEnumerator()
         {
@@ -66,7 +61,7 @@ namespace ApiFramework
                         return false;
                     }
 
-                    if (!filter.Check((JValue) resourceItem.ToJsonRepresentation()))
+                    if (!filter.Check((JValue) resourceItem.ToJson()))
                     {
                         return false;
                     }
@@ -80,7 +75,7 @@ namespace ApiFramework
 
         public JArray ToJsonRepresentation()
         {
-            return new JArray(from resource in this select resource.ToJsonRepresentation());
+            return new JArray(from resource in this select resource.ToJson());
         }
 
         public string ToJson()

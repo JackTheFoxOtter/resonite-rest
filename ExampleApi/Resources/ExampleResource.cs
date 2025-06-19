@@ -1,4 +1,5 @@
-﻿using ApiFramework.Resources;
+﻿using ApiFramework.Enums;
+using ApiFramework.Resources;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -12,44 +13,47 @@ namespace ExampleApi.Resources
         private DateTime _createdAt;
         [JsonProperty(PropertyName = "updatedAt")]
         private DateTime _updatedAt;
-        [JsonProperty(PropertyName = "author")]
-        private string _author;
-        [JsonProperty(PropertyName = "title")]
-        private string _title; 
-        [JsonProperty(PropertyName = "content")]
-        private string _content;
-        [JsonProperty(PropertyName = "views")]
-        private int _views;
-        [JsonProperty(PropertyName = "likes")]
-        private int _likes;
+        [JsonProperty(PropertyName = "name")]
+        private string _name;
+        [JsonProperty(PropertyName = "counter")]
+        private string _counter;
 
-        private static string[] _editableItems =
-        {
-            "author",
-            "title",
-            "content",
-            "views",
-            "likes"
-        };
+        public string ID { get => _id; set => _id = value; }
+        public DateTime CreatedAt { get => _createdAt; set => _createdAt = value; }
+        public DateTime UpdatedAt { get => _updatedAt; set => _updatedAt = value; }
+        public string Name { get => _name; set => _name = value; }
+        public string Counter { get => _counter; set => _counter = value; }
 
         public ExampleResource(JToken json) : base(json)
         {
             _createdAt = DateTime.Now;
+            _updatedAt = DateTime.Now;
         }
 
         public ExampleResource(string json) : base(json) 
         {
             _createdAt = DateTime.Now;
+            _updatedAt = DateTime.Now;
         }
-
         public override string GetResourceName()
         {
             return "ExampleResource";
         }
 
-        public override bool CanEditItemCheck(string[] itemPath)
+        private readonly static string[] _createableItems = { "id", "name", "counter" };
+        private readonly static string[] _modifiableItems = { "name", "counter" };
+        private readonly static string[] _deleteableItems = { "name", "counter" };
+
+        public override EditPermission GetItemPermissions(string[] itemPath)
         {
-            return _editableItems.Contains(string.Join(".", itemPath));
+            string fullPath = string.Join(".", itemPath);
+            EditPermission perms = EditPermission.None;
+
+            if (_createableItems.Contains(fullPath)) perms |= EditPermission.Create;
+            if (_modifiableItems.Contains(fullPath)) perms |= EditPermission.Modify;
+            if (_deleteableItems.Contains(fullPath)) perms |= EditPermission.Delete;
+
+            return perms;
         }
 
         public static string ToJson(ExampleResource resource)
@@ -59,7 +63,7 @@ namespace ExampleApi.Resources
 
         public static ExampleResource? FromJson(string json)
         {
-            return (ExampleResource?)JsonConvert.DeserializeObject(json, typeof(ExampleResource));
+            return JsonConvert.DeserializeObject<ExampleResource>(json);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using ApiFramework.Exceptions;
+﻿using ApiFramework.Enums;
+using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json.Linq;
 using System;
@@ -9,70 +10,72 @@ namespace ApiFramework.Resources
 {
     public class ApiItemDict : ApiItem, IApiItemContainer, IEnumerable<KeyValuePair<string, IApiItem>>
     {
-        private Dictionary<string, IApiItem> _itemMapping;
-        private Dictionary<IApiItem, string> _itemReverseMapping;
+        private Dictionary<string, IApiItem> ItemMapping { get; } = new();
+        private Dictionary<IApiItem, string> ItemReverseMapping { get; } = new();
 
-        public ApiItemDict(IApiItemContainer parent, bool canEdit) : base(parent, canEdit)
-        {
-            _itemMapping = new();
-            _itemReverseMapping= new();
-        }
+        public ApiItemDict(IApiItemContainer parent, EditPermission perms) : base(parent, perms) { }
+
         public int Count()
         {
-            return _itemMapping.Count;
+            return ItemMapping.Count;
         }
 
         public bool Contains(IApiItem item)
         {
-            return _itemReverseMapping.ContainsKey(item);
+            return ItemReverseMapping.ContainsKey(item);
         }
 
         public bool ContainsKey(string key)
         {
-            return _itemMapping.ContainsKey(key);
+            return ItemMapping.ContainsKey(key);
         }
 
         public string NameOf(IApiItem item)
         {
             if (!Contains(item)) throw new ArgumentException($"ApiItemDict doesn't contain item {item}");
-            return _itemReverseMapping[item];
+
+            return ItemReverseMapping[item];
         }
 
         public void Insert(string key, IApiItem item) => Insert(key, item, true);
-        public void Insert(string key, IApiItem item, bool checkCanEdit)
+        public void Insert(string key, IApiItem item, bool checkCanModify)
         {
-            if (checkCanEdit && !CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (ContainsKey(key)) throw new ArgumentException($"ApiItemDict already contains an item with key {key}");
             if (Contains(item)) throw new ArgumentException($"ApiItemDict already contains item {item}");
-            _itemMapping.Add(key, item);
-            _itemReverseMapping.Add(item, key);
+
+            ItemMapping.Add(key, item);
+            ItemReverseMapping.Add(item, key);
         }
 
-        public void InsertValue<T>(string key, T value, bool canEdit) => InsertValue<T>(key, value, canEdit, true);
-        public void InsertValue<T>(string key, T value, bool canEdit, bool checkCanEdit)
+        public void InsertValue<T>(string key, T value, EditPermission perms) => InsertValue<T>(key, value, perms, true);
+        public void InsertValue<T>(string key, T value, EditPermission perms, bool checkCanModify)
         {
-            if (checkCanEdit && !CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
-            IApiItem item = new ApiItemValue<T>(this, canEdit, value);
+            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+
+            IApiItem item = new ApiItemValue<T>(this, perms, value);
             Insert(key, item);
         }
 
         public void Remove(string key) => Remove(key, true);
-        public void Remove(string key, bool checkCanEdit)
+        public void Remove(string key, bool checkCanModify)
         {
-            if (checkCanEdit && !CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+
             if (ContainsKey(key))
             {
-                _itemReverseMapping.Remove(_itemMapping[key]);
-                _itemMapping.Remove(key);
+                ItemReverseMapping.Remove(ItemMapping[key]);
+                ItemMapping.Remove(key);
             }
         }
 
         public void Clear() => Clear(true);
-        public void Clear(bool checkCanEdit)
+        public void Clear(bool checkCanModify)
         {
-            if (checkCanEdit && !CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
-            _itemReverseMapping.Clear();
-            _itemMapping.Clear();
+            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+
+            ItemReverseMapping.Clear();
+            ItemMapping.Clear();
         }
 
         public IApiItem this[string key]
@@ -80,37 +83,38 @@ namespace ApiFramework.Resources
             get
             {
                 if (!ContainsKey(key)) throw new ArgumentException($"ApiItemDict doesn't contain an item with key {key}");
-                return _itemMapping[key];
+
+                return ItemMapping[key];
             }
         }
 
-        public override JToken ToJsonRepresentation()
+        public override JToken ToJson()
         {
-            //Dictionary<string, JToken> jsonDict = _itemMapping.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonRepresentation());
             JObject jsonObj = new JObject();
-            foreach (KeyValuePair<string, IApiItem> kv in _itemMapping)
+            foreach (KeyValuePair<string, IApiItem> kv in ItemMapping)
             {
-                jsonObj.Add(kv.Key, kv.Value.ToJsonRepresentation());
+                jsonObj.Add(kv.Key, kv.Value.ToJson());
             }
             return jsonObj;
-            //return _itemMapping.ToDictionary(kv => kv.Key, kv => kv.Value.ToJsonRepresentation()));
         }
 
-        public override IApiItem CreateCopy(IApiItemContainer container, bool canEdit)
+        public override IApiItem CreateCopy(IApiItemContainer container, EditPermission perms)
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
-            ApiItemDict newDict = new ApiItemDict(container, canEdit);
-            foreach (KeyValuePair<string, IApiItem> kv in _itemMapping)
+
+            ApiItemDict newDict = new ApiItemDict(container, perms);
+            foreach (KeyValuePair<string, IApiItem> kv in ItemMapping)
             {
-                newDict.Insert(kv.Key, kv.Value.CreateCopy(newDict, kv.Value.CanEdit()));
+                newDict.Insert(kv.Key, kv.Value.CreateCopy(newDict, kv.Value.Permissions));
             }
             return newDict;
         }
 
         public override void UpdateFrom(IApiItem other)
         {
-            if (!CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
+            if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (other == null) throw new ArgumentNullException(nameof(other));
+
             if (other is ApiItemDict otherDict)
             {
                 foreach (KeyValuePair<string, IApiItem> kv in otherDict)
@@ -125,7 +129,7 @@ namespace ApiFramework.Resources
                     else
                     {
                         // Insert new item
-                        Insert(key, item.CreateCopy(this, item.CanEdit()));
+                        Insert(key, item.CreateCopy(this, item.Permissions));
                     }
                 }
             }
@@ -137,12 +141,12 @@ namespace ApiFramework.Resources
 
         public IEnumerator<KeyValuePair<string, IApiItem>> GetEnumerator()
         {
-            return _itemMapping.GetEnumerator();
+            return ItemMapping.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return _itemMapping.GetEnumerator();
+            return ItemMapping.GetEnumerator();
         }
     }
 }

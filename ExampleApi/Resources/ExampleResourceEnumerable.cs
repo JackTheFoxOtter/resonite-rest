@@ -4,14 +4,11 @@ namespace ExampleApi.Resources
 {
     internal class ExampleResourceEnumerable : ApiResourceEnumerable<ExampleResource>
     {
-        private IEnumerator<ExampleResource> _enumerator;
+        public override IEnumerator<ExampleResource> Enumerator { get; }
 
-        protected override IEnumerator<ExampleResource> Enumerator
+        public ExampleResourceEnumerable(IEnumerable<ExampleResource> resources)
         {
-            get { return _enumerator; }
-            set { _enumerator = value; }
+            Enumerator = resources.GetEnumerator();
         }
-
-        public ExampleResourceEnumerable(IEnumerable<ExampleResource> resources) : base(resources) { }
     }
 }

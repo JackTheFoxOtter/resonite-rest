@@ -1,4 +1,5 @@
-﻿using ApiFramework.Exceptions;
+﻿using ApiFramework.Enums;
+using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -9,65 +10,57 @@ namespace ApiFramework.Resources
     public class ApiItemValue<T> : ApiItem
     {
         private T? _value;
-
-        public ApiItemValue(IApiItemContainer parent, bool canEdit, T? value) : base(parent, canEdit)
-        {
-            _value = value;
-        }
-
         public T? Value
         {
-            get
-            {
-                return _value;
-            }
+            get => _value;
             set
             {
-                if (!CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
+                if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
                 _value = value;
             }
         }
 
-        public override JToken ToJsonRepresentation()
+        public ApiItemValue(IApiItemContainer parent, EditPermission perms, T? value) : base(parent, perms)
+        {
+            _value = value;
+        }
+
+        public override JToken ToJson()
         {
             return new JValue(Value);
         }
 
-        public override IApiItem CreateCopy(IApiItemContainer container, bool canEdit)
+        public override IApiItem CreateCopy(IApiItemContainer container, EditPermission perms)
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
+
             if (typeof(T).IsValueType)
             {
                 // Value type -> pass by value
-                return new ApiItemValue<T>(container, canEdit, Value);
+                return new ApiItemValue<T>(container, perms, Value);
             }
             else
             {
                 // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                return new ApiItemValue<T>(container, canEdit, JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)));
+                return new ApiItemValue<T>(container, perms, JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)));
             }
         }
 
         public override void UpdateFrom(IApiItem other)
         {
-            if (!CanEdit()) throw new ApiResourceItemReadOnlyException(ToString());
+            if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (other == null) throw new ArgumentNullException(nameof(other));
-            if (other is ApiItemValue<T> otherValue)
+            if (other is not ApiItemValue<T> otherValue) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+
+            if (typeof(T).IsValueType)
             {
-                if (typeof(T).IsValueType)
-                {
-                    // Value type -> pass by value
-                    Value = otherValue.Value;
-                }
-                else
-                {
-                    // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                    Value = JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(otherValue.Value));
-                }
+                // Value type -> pass by value
+                Value = otherValue.Value;
             }
             else
             {
-                throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+                // Reference type -> pass by reference, so create copy through serializing / deseraializing
+                Value = JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(otherValue.Value));
             }
         }
     }

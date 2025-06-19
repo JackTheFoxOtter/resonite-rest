@@ -22,17 +22,21 @@ namespace ExampleApi.Resources
 
         protected override async Task<ExampleResource?> SelectResource(string resourceId)
         {
-            string json = _resources.GetValueOrDefault(resourceId) ?? throw new ApiResourceNotFoundException(typeof(ExampleResource), resourceId);
+            string json = _resources[resourceId] ?? throw new ApiResourceNotFoundException(typeof(ExampleResource), resourceId);
             ExampleResource resource = new ExampleResource(json);
 
             return resource;
+            throw new ApiMethodNotmplementedException(BaseRoute, "Select");
         }
 
         protected override async Task<string?> CreateResource(ExampleResource resource)
         {
-            string resourceId = Guid.NewGuid().ToString();
+            string new_id = Guid.NewGuid().ToString();
 
-            throw new ApiMethodNotmplementedException(BaseRoute, "Create");
+            resource.ID = new_id;
+            _resources.Add(new_id, resource.ToJsonString());
+
+            return new_id;
         }
 
         protected override async Task<bool> UpdateResource(ExampleResource resource)

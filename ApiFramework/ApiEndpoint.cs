@@ -3,21 +3,22 @@ using System.Collections.Generic;
 
 namespace ApiFramework
 {
+    /// <summary>
+    /// Represents an API endpoint that can be invoked via HTTP request.
+    /// Endpoints are a combination of HTTP method & route. Routes can contain placeholders.
+    /// </summary>
     public class ApiEndpoint
     {
-        private readonly string _httpMethod;
-        private readonly Uri _route;
+        public string HttpMethod { get; }
+        public Uri Route { get; }
 
         public ApiEndpoint(string method, string route) : this(method, new Uri(route, UriKind.Relative)) { }
 
         public ApiEndpoint(string method, Uri route)
         {
-            _httpMethod = method;
-            _route = route;
+            HttpMethod = method;
+            Route = route;
         }
-
-        public string Method => _httpMethod;
-        public Uri Route => _route;
 
         /// <summary>
         /// Checks wether this endpoint is a match for the specified route & httpMethod.
@@ -34,9 +35,9 @@ namespace ApiFramework
         /// <returns>True if this endpoint is a match for the target request.</returns>
         public bool IsMatchForRequest(string targetHttpMethod, Uri targetRoute, bool exactMatch)
         {
-            if (_httpMethod.ToLower() != targetHttpMethod.ToLower()) return false;
+            if (HttpMethod.ToLower() != targetHttpMethod.ToLower()) return false;
 
-            string[] endpointRouteSegments = Utils.GetRelativeUriPathSegments(_route);
+            string[] endpointRouteSegments = Utils.GetRelativeUriPathSegments(Route);
             string[] targetRouteSegments = Utils.GetRelativeUriPathSegments(targetRoute);
 
             if (!exactMatch && Utils.IsGreedyPlaceholder(endpointRouteSegments[endpointRouteSegments.Length - 1]))
@@ -80,7 +81,7 @@ namespace ApiFramework
                 throw new ArgumentException("The target request doesn't match this endpoint, so no arguments can be parsed!");
             }
 
-            string[] endpointRouteSegments = Utils.GetRelativeUriPathSegments(_route);
+            string[] endpointRouteSegments = Utils.GetRelativeUriPathSegments(Route);
             string[] targetRouteSegments = Utils.GetRelativeUriPathSegments(targetRoute);
 
             List<string> arguments = new();
@@ -100,7 +101,7 @@ namespace ApiFramework
 
         public override string ToString()
         {
-            return $"{_httpMethod} {_route}";
+            return $"{HttpMethod} {Route}";
         }
     }
 }

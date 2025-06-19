@@ -1,38 +1,39 @@
-﻿using ApiFramework.Interfaces;
+﻿using ApiFramework.Enums;
+using ApiFramework.Interfaces;
 using Newtonsoft.Json.Linq;
 using System;
 
 namespace ApiFramework.Resources
 {
-    public abstract class ApiResource : IApiItemContainer
+    public abstract class ApiResource : IApiResource, IApiItemContainer
     {
-        private readonly IApiItem _rootItem;
-        private readonly bool _canEdit;
-
-        public IApiItem RootItem => _rootItem;
-
-        public ApiResource()
-        {
-            _rootItem = new ApiItemDict(this, CanEditItemCheck(new string[] { }));
-            _canEdit = _rootItem.CanEdit();
-        }
+        public IApiItem RootItem { get; }
 
         public ApiResource(IApiItem rootItem)
         {
-            _rootItem = rootItem;
-            _canEdit = rootItem.CanEdit();
+            RootItem = rootItem;
         }
 
         public ApiResource(JToken json)
         {
-            _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
-            _canEdit = _rootItem.CanEdit();
+            RootItem = ApiItem.FromJson(this, GetItemPermissions, json);
         }
 
         public ApiResource(string json)
         {
-            _rootItem = ApiItem.FromJson(this, CanEditItemCheck, json);
-            _canEdit = _rootItem.CanEdit();
+            RootItem = ApiItem.FromJson(this, GetItemPermissions, json);
+        }
+
+        public abstract string GetResourceName();
+
+        public abstract EditPermission GetItemPermissions(string[] path);
+
+        public void UpdateFrom(ApiResource other)
+        {
+            if (other == null) throw new ArgumentNullException(nameof(other));
+            if (GetType() != other.GetType()) throw new ArgumentException($"Can't update {GetType()} from resource with different type ({other.GetType()})");
+
+            throw new NotImplementedException();
         }
 
         public int Count()
@@ -40,14 +41,15 @@ namespace ApiFramework.Resources
             return 1;
         }
 
-        public bool CanEdit()
-        {
-            return _canEdit;
-        }
-
         public bool Contains(IApiItem item)
         {
-            return item == _rootItem;
+            return item == RootItem;
+        }
+
+        public string NameOf(IApiItem item)
+        {
+            if (item != RootItem) throw new ArgumentException($"ApiResource doesn't contain item {item}");
+            return ToString();
         }
 
         public IApiItem? GetItemAtPath(params string[] itemPath)
@@ -85,57 +87,27 @@ namespace ApiFramework.Resources
         public T? GetItemAtPath<T>(params string[] itemPath) where T: IApiItem
         {
             IApiItem? item = GetItemAtPath(itemPath);
-            
-            if (item is T tItem) return tItem;
-            
-            return default;
+            return (item is T tItem) ? tItem : default;
         }
 
-        public bool ContainsItemAtPath(string[] itemPath)
+        public JToken ToJson()
         {
-            IApiItem? item = GetItemAtPath(itemPath);
-            return item != null;
+            return RootItem.ToJson();
         }
 
-        public string NameOf(IApiItem item)
+        public string ToJsonString()
         {
-            if (item != _rootItem) throw new ArgumentException($"ApiResource doesn't contain item {item}");
-            return ToString();
-        }
-
-        public JToken ToJsonRepresentation()
-        {
-            return _rootItem.ToJsonRepresentation();
-        }
-
-        public string ToJson()
-        {
-            return _rootItem.ToJson();
+            return RootItem.ToJsonString();
         }
 
         public ApiResponse ToResponse()
         {
-            return _rootItem.ToResponse();
-        }
-
-        public virtual bool CanEditItemCheck(string[] itemPath)
-        {
-            return true;
+            return RootItem.ToResponse();
         }
 
         public override string ToString()
         {
             return GetResourceName();
-        }
-
-        public abstract string GetResourceName();
-
-        public void UpdateFrom(ApiResource other)
-        {
-            if (other == null) throw new ArgumentNullException(nameof(other));
-            if (GetType() != other.GetType()) throw new ArgumentException($"Can't update {GetType()} from resource with different type ({other.GetType()})");
-
-
         }
     }
 }

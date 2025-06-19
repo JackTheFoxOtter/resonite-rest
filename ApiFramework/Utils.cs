@@ -1,5 +1,4 @@
 ﻿using ApiFramework.Exceptions;
-using Elements.Core;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Specialized;
@@ -35,7 +34,6 @@ namespace ApiFramework
                 }
                 catch (JsonReaderException ex)
                 {
-                    UniLog.Error(ex.Message, true);
                     throw new ApiJsonParsingException($"Failed to parse query parameter '{paramName}'. (Expected JSON-formatted {typeof(T)} value)");
                 }
 

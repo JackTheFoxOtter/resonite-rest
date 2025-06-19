@@ -81,8 +81,8 @@ namespace ApiFramework.Resources
                     T resource = (T)Activator.CreateInstance(typeof(T), json);
                     
                     string createdResourceId = await CreateResource(resource) ?? throw new ApiResourceNotCreatedException(typeof(T));
-                    
-                    return new ApiResponse(201, JsonConvert.SerializeObject(new JProperty("resourceId", createdResourceId))); // 201 - Created
+
+                    return new ApiResponse(201, new JObject { ["resourceId"] = createdResourceId }.ToString(Formatting.None)); // 201 - Created
                 });
             }
 

@@ -1,5 +1,5 @@
 ﻿using ApiFramework.Exceptions;
-using Elements.Core;
+using ApiFramework.Interfaces;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -13,47 +13,64 @@ using System.Web;
 
 namespace ApiFramework
 {
+    /// <summary>
+    /// Hosts an HTTP API.
+    /// Allows registering handlers for routes and automatically determines which handler to invoke for incoming requests.
+    /// </summary>
     public class ApiServer
     {
-        private readonly Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> _handlers = new();
-        private string _baseRoute;
-        private bool _isRunning = false;
-
         private CancellationTokenSource? _listenerCancellationTokenSource;
         private HttpListener? _listener;
         private Task? _listenerTask;
 
-        public bool IsRunning => _isRunning;
+        private Dictionary<ApiEndpoint, Func<ApiRequest, Task<ApiResponse>>> Handlers { get; } = new();
+        public ILogger Logger { get; }
+        public string BaseRoute { get; }
+        public bool IsRunning { get; private set; }
+
+        public ApiServer(ILogger logger, string? baseRoute)
+        {
+            Logger = logger;
+            BaseRoute = (baseRoute != null && baseRoute.Length > 0) ? baseRoute.Trim('/') : String.Empty;
+
+            // Register default root handler.
+            RegisterHandler(new ApiEndpoint("GET", String.Empty), async (ApiRequest request) =>
+            {
+                // List all registered endpoints.
+                string[] endpoints = (from endpoint in Handlers.Keys select endpoint.ToString()).ToArray();
+                return new ApiResponse(200, JsonConvert.SerializeObject(endpoints));
+            });
+        }
 
         public void RegisterHandler(ApiEndpoint endpoint, Func<ApiRequest, Task<ApiResponse>> handler)
         {
-            if (_handlers.ContainsKey(endpoint)) {
+            if (Handlers.ContainsKey(endpoint)) {
                 throw new ArgumentException($"A handler is already defined for endpoint {endpoint}!");
             }
 
-            UniLog.Log($"[ApiFramework] Registering handler for endpoint: {endpoint}");
-            _handlers.Add(endpoint, handler);
+            Logger.Log($"Registering handler for endpoint: {endpoint}");
+            Handlers.Add(endpoint, handler);
         }
 
         public void RemoveHandler(ApiEndpoint endpoint)
         {
-            if (_handlers.ContainsKey(endpoint))
+            if (Handlers.ContainsKey(endpoint))
             {
-                UniLog.Log($"[ApiFramework] Removing handler for endpoint: {endpoint}");
-                _handlers.Remove(endpoint);
+                Logger.Log($"Removing handler for endpoint: {endpoint}");
+                Handlers.Remove(endpoint);
             }
         }
 
         private ApiEndpoint? FindBestMatchingEndpoint(string targetMethod, Uri targetRoute)
         {
-            foreach (ApiEndpoint endpoint in _handlers.Keys)
+            foreach (ApiEndpoint endpoint in Handlers.Keys)
             {
                 if (endpoint.IsMatchForRequest(targetMethod, targetRoute, true)) {
                     return endpoint;
                 }
             }
 
-            foreach (ApiEndpoint endpoint in _handlers.Keys) {
+            foreach (ApiEndpoint endpoint in Handlers.Keys) {
                 if (endpoint.IsMatchForRequest(targetMethod, targetRoute, false))
                 {
                     return endpoint;
@@ -79,46 +96,38 @@ namespace ApiFramework
             context.Response.Close();
         }
 
-        public ApiServer(string? baseRoute)
-        {
-            if (baseRoute != null && !string.IsNullOrEmpty(baseRoute))
-            {
-                _baseRoute = baseRoute.Trim('/');
-            }
-            else
-            {
-                _baseRoute = "";
-            }
-
-            // Register default root handler.
-            RegisterHandler(new ApiEndpoint("GET", ""), async (ApiRequest request) =>
-            {
-                string[] endpoints = (from endpoint in _handlers.Keys select endpoint.ToString()).ToArray();
-                return new ApiResponse(200, JsonConvert.SerializeObject(endpoints));
-            });
-        }
-
         public async Task Start(string host, int port)
         {
-            if (_isRunning) throw new ApplicationException("API server is already running!");
+            if (IsRunning) throw new ApplicationException("API server is already running!");
 
-            UniLog.Log($"[ApiFramework] Starting API server...");
-
-            string uriPrefix = $"http://{host}:{port}/{_baseRoute}/";
+            string uriPrefix = $"http://{host}:{port}/{BaseRoute}/";
+            
+            Logger.Log($"Attempting to start API server...");
             try
             {
-                // Attempt to start the listener
+                // Attempt to start the listener.
                 StartInternal(uriPrefix);
             }
             catch (HttpListenerException e)
             {
                 if (e.ErrorCode != 5) throw;
-                
-                // Access denied, this indicates that the requested URI can't be listened on (probably because it's a wildcard one)
+
+                // Access denied, this indicates that the requested URI can't be listened on (probably because it's a wildcard one).
                 // Add URI to HTTP access control list for current user and retry.
-                UniLog.Log("[ApiFramework] Access denied, requesting to add URI prefix to HTTP access control list...");
+                Logger.Log("Access denied, requesting to add URI prefix to HTTP access control list...");
                 await Utils.AddAclAddress(uriPrefix);
                 StartInternal(uriPrefix);
+            }
+            finally 
+            {
+                if (IsRunning)
+                {
+                    Logger.Log($"API server started & listening on: {uriPrefix}");
+                }
+                else
+                {
+                    throw new ApplicationException("Failed to start API server!");
+                }
             }
         }
 
@@ -133,20 +142,15 @@ namespace ApiFramework
                 await HandleRequests(_listenerCancellationTokenSource.Token);
             }, _listenerCancellationTokenSource.Token);
 
-            _isRunning = true;
-            
-            UniLog.Log($"[ApiFramework] Listening on: {uriPrefix}");
+            IsRunning = true;
         }
 
         public void Stop()
         {
-            UniLog.Log($"[ApiFramework] Stopping API server...");
-            if (!_isRunning)
-            {
-                throw new ApplicationException("API server is not running!");
-            }
+            if (!IsRunning) throw new ApplicationException("API server is not running!");
 
-            // Stop listener.
+            Logger.Log($"Stopping API server...");
+
             StopInternal();
         }
 
@@ -159,84 +163,95 @@ namespace ApiFramework
             _listenerCancellationTokenSource = null;
             _listener = null;
             _listenerTask = null;
-            _isRunning = false;
+            IsRunning = false;
         }
         
         async private Task HandleRequests(CancellationToken cancellationToken)
         {
             while (!cancellationToken.IsCancellationRequested && _listener != null)
             {
+                // First wait for incoming request.
+                HttpListenerContext context;
                 try
                 {
-                    HttpListenerContext context = await _listener.GetContextAsync().WrapCancellable(cancellationToken);
-                    UniLog.Log($"[ApiFramework] Received request: '{context.Request.HttpMethod} {context.Request.Url}', UserAgent: '{context.Request.UserAgent}'");
-
-                    ApiResponse? response = null;
-                    try
-                    {
-                        // Determine API route of request
-                        string httpMethod = context.Request.HttpMethod;
-                        string requestPath = context.Request.Url.AbsolutePath.Trim('/');
-                        if (requestPath.StartsWith(_baseRoute)) requestPath = requestPath.Remove(0, _baseRoute.Length);
-                        Uri apiRoute = new(requestPath, UriKind.Relative);
-
-                        ApiEndpoint? endpoint = FindBestMatchingEndpoint(httpMethod, apiRoute);
-                        if (endpoint != null)
-                        {
-                            string[] arguments = endpoint.ParseRequestArguments(httpMethod, apiRoute);
-                            NameValueCollection queryParams = HttpUtility.ParseQueryString(context.Request.Url.Query);
-                            ApiRequest request = new(context, arguments, queryParams);
-                            response = await _handlers[endpoint].Invoke(request);
-                        }
-                        else
-                        {
-                            string error = $"No endpoint found for route: '{apiRoute}'";
-                            response = new ApiResponse(404, JsonConvert.SerializeObject(error));
-                        }
-                    }
-                    catch (ApiException apiEx)
-                    {
-                        response = apiEx.ToResponse();
-                    }
-                    catch (AggregateException aggregateEx)
-                    {
-                        foreach (Exception innerEx in aggregateEx.Flatten().InnerExceptions)
-                        {
-                            if (innerEx is ApiException apiEx)
-                            {
-                                response = apiEx.ToResponse();
-                                break;
-                            }
-                        }
-
-                        if (response == null)
-                        { 
-                            string error = $"One or more unhandled exception while processing request: {aggregateEx}";
-                            response = new ApiResponse(500, JsonConvert.SerializeObject(error));
-                            throw;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        string error = $"Unhandled exception while processing request: {ex}";
-                        response = new ApiResponse(500, JsonConvert.SerializeObject(error));
-                        throw;
-                    }
-                    finally
-                    {
-                        await Respond(context, response);
-                    }
+                    context = await _listener.GetContextAsync().WrapCancellable(cancellationToken);
+                    Logger.Log($"Received request: '{context.Request.HttpMethod} {context.Request.Url}', UserAgent: '{context.Request.UserAgent}'");
                 }
                 catch (TaskCanceledException)
                 {
                     // Task was cancelled.
                     break;
                 }
+
+                // Then handle the request & respond.
+                ApiResponse? response = null;
+                try
+                {
+                    response = await HandleRequest(context);
+                }
+                catch (ApiException apiEx)
+                {
+                    response = apiEx.ToResponse();
+                }
+                catch (AggregateException aggregateEx)
+                {
+                    foreach (Exception innerEx in aggregateEx.Flatten().InnerExceptions)
+                    {
+                        if (innerEx is ApiException apiEx)
+                        {
+                            response = apiEx.ToResponse();
+                            break;
+                        }
+                    }
+
+                    if (response == null)
+                    {
+                        string error = $"One or more unhandled exceptions occured while processing request: {aggregateEx}";
+                        response = new ApiResponse(500, JsonConvert.SerializeObject(error));
+                        throw;
+                    }
+                }
                 catch (Exception ex)
                 {
-                    // Something went wrong.
-                    UniLog.Log($"[ApiFramework] Exception during handling of request!\n{ex}");
+                    string error = $"Unhandled exception occured while processing request: {ex}";
+                    response = new ApiResponse(500, JsonConvert.SerializeObject(error));
+                    throw;
                 }
+                finally
+                {
+                    if (response == null)
+                    {
+                        // This should't be possible.
+                        string error = $"Failed to determine suitable response for request!";
+                        response = new ApiResponse(500, JsonConvert.SerializeObject(error));
+                    }
+                    
+                    await Respond(context, response);
+                }
+            }
+        }
+
+        async private Task<ApiResponse> HandleRequest(HttpListenerContext context)
+        {
+            // Determine API route of request.
+            string httpMethod = context.Request.HttpMethod;
+            string requestPath = context.Request.Url.AbsolutePath.Trim('/');
+            if (requestPath.StartsWith(BaseRoute)) requestPath = requestPath.Remove(0, BaseRoute.Length);
+            Uri apiRoute = new(requestPath, UriKind.Relative);
+
+            // Try to find & invoke endpoint to handle request.
+            ApiEndpoint? endpoint = FindBestMatchingEndpoint(httpMethod, apiRoute);
+            if (endpoint != null)
+            {
+                string[] arguments = endpoint.ParseRequestArguments(httpMethod, apiRoute);
+                NameValueCollection queryParams = HttpUtility.ParseQueryString(context.Request.Url.Query);
+                ApiRequest request = new(context, arguments, queryParams);
+                return await Handlers[endpoint].Invoke(request);
+            }
+            else
+            {
+                string error = $"No endpoint found for route: '{apiRoute}'";
+                return new ApiResponse(404, JsonConvert.SerializeObject(error));
             }
         }
     }
