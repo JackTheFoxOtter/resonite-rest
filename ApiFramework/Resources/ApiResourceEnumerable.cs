@@ -55,7 +55,7 @@ namespace ApiFramework
                 
                 foreach ((string argumentName, JValueFilter filter) in filters)
                 {
-                    IApiItem? resourceItem = resource.GetItemAtPath(argumentName.Split('.'));
+                    IApiItem? resourceItem = resource.GetProperty<IApiItem>(ApiPropertyPath.FromFullPath(argumentName));
                     if (resourceItem == null)
                     {
                         return false;

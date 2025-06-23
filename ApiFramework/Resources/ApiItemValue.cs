@@ -1,5 +1,4 @@
 ﻿using ApiFramework.Enums;
-using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -15,12 +14,13 @@ namespace ApiFramework.Resources
             get => _value;
             set
             {
-                if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+                CheckPermissions(EditPermission.Modify);
                 _value = value;
             }
         }
 
-        public ApiItemValue(IApiItemContainer parent, EditPermission perms, T? value) : base(parent, perms)
+        public ApiItemValue(EditPermission perms, T? value) : base(perms) { }
+        public ApiItemValue(EditPermission perms, IApiItemContainer parent, T? value) : base(perms, parent)
         {
             _value = value;
         }
@@ -37,20 +37,20 @@ namespace ApiFramework.Resources
             if (typeof(T).IsValueType)
             {
                 // Value type -> pass by value
-                return new ApiItemValue<T>(container, perms, Value);
+                return new ApiItemValue<T>(perms, container, Value);
             }
             else
             {
                 // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                return new ApiItemValue<T>(container, perms, JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)));
+                return new ApiItemValue<T>(perms, container, JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)));
             }
         }
 
-        public override void UpdateFrom(IApiItem other)
+        public override void UpdateFrom(IApiItem other, bool checkPermissions)
         {
-            if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (other is not ApiItemValue<T> otherValue) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+            if (checkPermissions) CheckPermissions(EditPermission.Modify); 
 
             if (typeof(T).IsValueType)
             {

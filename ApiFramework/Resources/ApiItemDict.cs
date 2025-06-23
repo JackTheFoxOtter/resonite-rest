@@ -1,5 +1,4 @@
 ﻿using ApiFramework.Enums;
-using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json.Linq;
 using System;
@@ -13,7 +12,8 @@ namespace ApiFramework.Resources
         private Dictionary<string, IApiItem> ItemMapping { get; } = new();
         private Dictionary<IApiItem, string> ItemReverseMapping { get; } = new();
 
-        public ApiItemDict(IApiItemContainer parent, EditPermission perms) : base(parent, perms) { }
+        public ApiItemDict(EditPermission perms) : base(perms) { }
+        public ApiItemDict(EditPermission perms, IApiItemContainer? parent) : base(perms, parent) { }
 
         public int Count()
         {
@@ -38,29 +38,21 @@ namespace ApiFramework.Resources
         }
 
         public void Insert(string key, IApiItem item) => Insert(key, item, true);
-        public void Insert(string key, IApiItem item, bool checkCanModify)
+        public void Insert(string key, IApiItem item, bool checkPermission)
         {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (ContainsKey(key)) throw new ArgumentException($"ApiItemDict already contains an item with key {key}");
             if (Contains(item)) throw new ArgumentException($"ApiItemDict already contains item {item}");
+            if (checkPermission) CheckPermissions(EditPermission.Modify);
 
             ItemMapping.Add(key, item);
             ItemReverseMapping.Add(item, key);
-        }
-
-        public void InsertValue<T>(string key, T value, EditPermission perms) => InsertValue<T>(key, value, perms, true);
-        public void InsertValue<T>(string key, T value, EditPermission perms, bool checkCanModify)
-        {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
-
-            IApiItem item = new ApiItemValue<T>(this, perms, value);
-            Insert(key, item);
+            item.SetParent(this);
         }
 
         public void Remove(string key) => Remove(key, true);
         public void Remove(string key, bool checkCanModify)
         {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkCanModify) CheckPermissions(EditPermission.Modify);
 
             if (ContainsKey(key))
             {
@@ -72,7 +64,7 @@ namespace ApiFramework.Resources
         public void Clear() => Clear(true);
         public void Clear(bool checkCanModify)
         {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkCanModify) CheckPermissions(EditPermission.Modify);
 
             ItemReverseMapping.Clear();
             ItemMapping.Clear();
@@ -102,7 +94,7 @@ namespace ApiFramework.Resources
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
 
-            ApiItemDict newDict = new ApiItemDict(container, perms);
+            ApiItemDict newDict = new ApiItemDict(perms, container);
             foreach (KeyValuePair<string, IApiItem> kv in ItemMapping)
             {
                 newDict.Insert(kv.Key, kv.Value.CreateCopy(newDict, kv.Value.Permissions));
@@ -110,10 +102,10 @@ namespace ApiFramework.Resources
             return newDict;
         }
 
-        public override void UpdateFrom(IApiItem other)
+        public override void UpdateFrom(IApiItem other, bool checkPermissions)
         {
-            if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (other == null) throw new ArgumentNullException(nameof(other));
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
 
             if (other is ApiItemDict otherDict)
             {
@@ -124,7 +116,7 @@ namespace ApiFramework.Resources
                     if (ContainsKey(key))
                     {
                         // Update existing item
-                        this[key].UpdateFrom(item);
+                        this[key].UpdateFrom(item, false); // Permissions already checked above
                     }
                     else
                     {

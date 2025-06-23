@@ -11,4 +11,38 @@
         ModifyDelete       = 0b00000110, // Modify & delete
         CreateModifyDelete = 0b00000111, // Create, modify & delete
     }
+
+    public static class EditPermissionExtensions
+    {
+        public static bool CanCreate(this EditPermission permission)
+        {
+            return (permission & EditPermission.Create) == EditPermission.Create;
+        }
+
+        public static bool CanModify(this EditPermission permission)
+        {
+            return (permission & EditPermission.Modify) == EditPermission.Modify;
+        }
+
+        public static bool CanDelete(this EditPermission permission)
+        {
+            return (permission & EditPermission.Delete) == EditPermission.Delete;
+        }
+
+        public static string ToFriendlyName(this EditPermission permissions)
+        {
+            switch (permissions)
+            {
+                case EditPermission.None: return "None";
+                case EditPermission.Create: return "Create";
+                case EditPermission.Modify: return "Modify";
+                case EditPermission.Delete: return "Delete";
+                case EditPermission.CreateModify: return "Create, Modify";
+                case EditPermission.CreateDelete: return "Create, Delete";
+                case EditPermission.ModifyDelete: return "Modify, Delete";
+                case EditPermission.CreateModifyDelete: return "Create, Modify, Delete";
+                default: return "Invalid Permission";
+            }
+        }
+    }
 }

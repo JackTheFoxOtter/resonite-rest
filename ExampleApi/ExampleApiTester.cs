@@ -1,4 +1,8 @@
-﻿using ApiFramework.Interfaces;
+﻿using ApiFramework;
+using ApiFramework.Enums;
+using ApiFramework.Interfaces;
+using ApiFramework.Resources;
+using ExampleApi.Resources;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net.Http;
@@ -21,12 +25,18 @@ namespace ExampleApi
         
         public async Task RunTests()
         {
-            await RunTest("Index", TestIndex);
-            await RunTest("Ping", TestPing);
-            await RunTest("Echo", TestEcho);
-            await RunTest("Echo with empty body", TestEchoWithEmptyBody);
-            await RunTest("Create a resource", TestCreateResource);
-            await RunTest("Create & access a resource", TestCreateAndAccessResource);
+            // Data Tests
+            await RunTest("Create resource", TestCreateResource);
+            //await RunTest("Resource roundtrip simple", TestResourceRoundtripSimple);
+            //await RunTest("Resource roundtrip complex", TestResourceRoundtripComplex);
+
+            // API Tests
+            //await RunTest("Index", TestIndex);
+            //await RunTest("Ping", TestPing);
+            //await RunTest("Echo", TestEcho);
+            //await RunTest("Echo with empty body", TestEchoWithEmptyBody);
+            //await RunTest("Create a resource", TestCreateResource);
+            //await RunTest("Create & access a resource", TestCreateAndAccessResource);
         }
 
         public async Task<bool> RunTest(string testName, Func<Task<bool>> test)
@@ -39,13 +49,72 @@ namespace ExampleApi
             return success;
         }
 
+        public async Task<bool> TestCreateResource()
+        {
+            ExampleResource resource = new ExampleResource();
+            Logger.Log($"Created resource {resource}:");
+            foreach (KeyValuePair<ApiPropertyPath, ApiPropertyInfo> info in resource.PropertyInfos)
+            {
+                ApiPropertyPath path = info.Key;
+                ApiPropertyInfo property = info.Value;
+
+                Logger.Log($" -> {path}: Type: {property.TargetType.GetNiceTypeName()}, Perms: {property.Permissions.ToFriendlyName()}");
+            }
+            Logger.Log($"Resource JSON: {resource.ToJsonString()}");
+            Logger.Log($"Test writing description (should work)");
+            resource.Description.Value = "Test Description";
+            Logger.Log($"Resource JSON: {resource.ToJsonString()}");
+
+            return true;
+        }
+
+        /// <summary>
+        /// Tests a full round-trip of an ExampleResource loaded from a JSON string.
+        /// Simple version - lists & objects are empty.
+        /// </summary>
+        /// <returns>Test successful</returns>
+        public async Task<bool> TestResourceRoundtripSimple()
+        {
+            string inputJsonStr = "{ id: 'ID00001', createDate: '2012-04-23T18:25:43.511Z', updateDate: '2012-04-23T18:25:43.511Z', name: 'Test Resource', 'description': null, 'listCount': 0, 'list': [], 'object': {} }";
+            JToken? inputJson = JsonConvert.DeserializeObject<JToken>(inputJsonStr);
+            Logger.Log($"Input: {inputJson?.ToString()}");
+            ExampleResource resource = new(inputJsonStr);
+            JToken outputJson = resource.ToJson();
+            Logger.Log($"Output: {outputJson.ToString()}");
+
+            return JToken.DeepEquals(inputJson, outputJson);
+        }
+
+        public async Task<bool> TestResourceRoundtripComplex()
+        {
+            string inputJsonStr = "{id: 'ID00002', name: 'Test Resource 2', 'listCount': 3, 'list': [12, 'Hello!', true], 'object': { 'a': 12, 'b': 'Hello!', 'c': true }}";
+            JToken? inputJson = JsonConvert.DeserializeObject<JToken>(inputJsonStr);
+            Logger.Log($"Input: {inputJson?.ToString()}");
+            ExampleResource resource = new(inputJsonStr);
+            JToken outputJson = resource.ToJson();
+            Logger.Log($"Output: {outputJson.ToString()}");
+
+            return JToken.DeepEquals(inputJson, outputJson);
+        }
+
+        // TODO:
+        // - Lists
+        // - Dicts
+        // - Update item that exists
+        // - Update item that doesn't exist
+        // - Try update item that is read-only
+        // - Delete item that exists
+        // - Try delete item that is read-only
+        // - Partially update resource from another resource
+        // - Fully update resource from another resource
+
         /// <summary>
         /// Tests the index functionality of the API framework.
         /// It should return a JSON list of all registered endpoints with 200 - OK.
         /// (We only test for the "ping" one)
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestIndex()
+        public async Task<bool> TestApiIndex()
         {
             HttpResponseMessage response = await HttpRequestWithLogging(new HttpRequestMessage(HttpMethod.Get, ""));
             JToken? responseJson = await ReadResponseAsJson(response);
@@ -63,7 +132,7 @@ namespace ExampleApi
         /// Should return "pong" with 200 - OK.
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestPing()
+        public async Task<bool> TestApiPing()
         {
             HttpResponseMessage response = await HttpRequestWithLogging(new HttpRequestMessage(HttpMethod.Get, "ping"));
             JToken? responseJson = await ReadResponseAsJson(response);
@@ -79,7 +148,7 @@ namespace ExampleApi
         /// Should return a 200 - OK response with the same payload as sent in the request.
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestEcho()
+        public async Task<bool> TestApiEcho()
         {
             string payload = "I'm a payload!";
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "echo");
@@ -98,7 +167,7 @@ namespace ExampleApi
         /// Should fail with 400 - Bad Request and a message indicating that the body cannot be empty.
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestEchoWithEmptyBody()
+        public async Task<bool> TestApiEchoWithEmptyBody()
         {
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "echo");
             request.Content = new System.Net.Http.StringContent(String.Empty, System.Text.Encoding.UTF8, "application/text");
@@ -116,7 +185,7 @@ namespace ExampleApi
         /// Should succeed with 201 - Created and contain a JSON object with the new resourceId in the response body.
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestCreateResource()
+        public async Task<bool> TestApiCreateResource()
         {
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "exampleResource/");
             request.Content = new System.Net.Http.StringContent("{ name: 'TestCreateResource', counter: 0 }");
@@ -135,7 +204,7 @@ namespace ExampleApi
         /// Should success with 200 - OK and contian the resource as a JSON object in the response body.
         /// </summary>
         /// <returns>Test successful</returns>
-        public async Task<bool> TestCreateAndAccessResource()
+        public async Task<bool> TestApiCreateAndAccessResource()
         {
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, "exampleResource/");
             request.Content = new System.Net.Http.StringContent("{ name: 'TestCreateAndAccessResource', counter: 0 }");

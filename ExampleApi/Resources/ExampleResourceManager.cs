@@ -33,7 +33,7 @@ namespace ExampleApi.Resources
         {
             string new_id = Guid.NewGuid().ToString();
 
-            resource.ID = new_id;
+            resource.ID.Value = new_id;
             _resources.Add(new_id, resource.ToJsonString());
 
             return new_id;

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -40,6 +41,32 @@ namespace ApiFramework
             }
             
             return paramValue;
+        }
+
+        /// <summary>
+        /// Returns a nicely formatted type name of the target type.
+        /// </summary>
+        /// <param name="type">Type to get type name for.</param>
+        /// <returns>Nicely formatted type name for target type.</returns>
+        public static string GetNiceTypeName(this Type type)
+        {
+            if (type.IsGenericType && type.Name.Contains('`'))
+            {
+                StringBuilder builder = new();
+                builder.Append(type.Name.Split('`')[0]);
+                builder.Append("<");
+                Type[] genericArguments = type.GetGenericArguments();
+                for (int i = 0; i < genericArguments.Length; i++)
+                {
+                    Type argumentType = genericArguments[i];
+                    builder.Append(argumentType.GetNiceTypeName());
+                    if (i < genericArguments.Length - 1) 
+                        builder.Append(", ");
+                }
+                builder.Append(">");
+                return builder.ToString();
+            }
+            return type.Name;
         }
 
         /// <summary>

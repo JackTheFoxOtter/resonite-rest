@@ -63,7 +63,7 @@ namespace ApiFramework.Resources
                     else
                     {
                         // Select a sub-element of the resource
-                        IApiItem item = resource.GetItemAtPath(itemPath) ?? throw new ApiResourceItemNotFoundException(typeof(T), string.Join(".", itemPath));
+                        IApiItem item = resource.GetProperty<IApiItem>(new ApiPropertyPath(itemPath)) ?? throw new ApiResourceItemNotFoundException(typeof(T), string.Join(".", itemPath));
                         return item.ToResponse();
                     }
                 });

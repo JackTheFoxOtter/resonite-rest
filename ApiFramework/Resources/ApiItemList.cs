@@ -1,5 +1,4 @@
 ﻿using ApiFramework.Enums;
-using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json.Linq;
 using System;
@@ -13,7 +12,8 @@ namespace ApiFramework.Resources
     {
         private List<IApiItem> Items { get; } = new();
 
-        public ApiItemList(IApiItemContainer parent, EditPermission perms) : base(parent, perms) { }
+        public ApiItemList(EditPermission perms) : base(perms) { }
+        public ApiItemList(EditPermission perms, IApiItemContainer? parent) : base(perms, parent) { }
 
         public int Count()
         {
@@ -40,34 +40,34 @@ namespace ApiFramework.Resources
         }
 
         public void Insert(IApiItem item) => Insert(item, true);
-        public void Insert(IApiItem item, bool checkCanModify)
+        public void Insert(IApiItem item, bool checkPermissions)
         {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
 
             Items.Add(item);
+            item.SetParent(this);
         }
 
         public void InsertValue<T>(T value, EditPermission perms) => InsertValue(value, perms, true);
-        public void InsertValue<T>(T value, EditPermission perms, bool checkCanModify)
+        public void InsertValue<T>(T value, EditPermission perms, bool checkPermissions)
         {
-            if (checkCanModify && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
 
-            IApiItem item = new ApiItemValue<T>(this, perms, value);
-            Insert(item);
+            Insert(new ApiItemValue<T>(perms, this, value));
         }
 
         public void Remove(IApiItem item) => Remove(item, true);
-        public void Remove(IApiItem item, bool checkCanEdit)
+        public void Remove(IApiItem item, bool checkPermissions)
         {
-            if (checkCanEdit && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
 
             Items.Remove(item);
         }
 
         public void Clear() => Clear(true); 
-        public void Clear(bool checkCanEdit)
+        public void Clear(bool checkPermissions)
         {
-            if (checkCanEdit && !CanModify) throw new ApiResourceItemReadOnlyException(ToString());
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
 
             Items.Clear();
         }
@@ -91,7 +91,7 @@ namespace ApiFramework.Resources
         {
             if (container == null) throw new ArgumentNullException(nameof(container));
 
-            ApiItemList newList = new ApiItemList(container, perms);
+            ApiItemList newList = new ApiItemList(perms, container);
             foreach (IApiItem item in Items)
             {
                 IApiItem newItem = item.CreateCopy(newList, perms);
@@ -100,11 +100,11 @@ namespace ApiFramework.Resources
             return newList;
         }
 
-        public override void UpdateFrom(IApiItem other)
+        public override void UpdateFrom(IApiItem other, bool checkPermissions)
         {
-            if (!CanModify) throw new ApiResourceItemReadOnlyException(ToString());
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (other is not ApiItemList otherList) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+            if (checkPermissions) CheckPermissions(EditPermission.Modify);
             
             Clear();
             foreach (IApiItem item in otherList)

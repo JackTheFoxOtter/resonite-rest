@@ -5,7 +5,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ApiFramework.Resources
 {
@@ -15,21 +14,57 @@ namespace ApiFramework.Resources
     /// </summary>
     public abstract class ApiItem : IApiItem
     {
-        public IApiItemContainer Parent { get; }
-        public EditPermission Permissions { get; }
-        public bool CanCreate => (Permissions | EditPermission.Create) > 0; // TODO: Move into IApiItem once on .Net9
-        public bool CanModify => (Permissions | EditPermission.Modify) > 0; // TODO: Move into IApiItem once on .Net9
-        public bool CanDelete => (Permissions | EditPermission.Delete) > 0; // TODO: Move into IApiItem once on .Net9
+        public IApiResource? Resource { get; private set; }
+        public IApiItemContainer? Parent { get; private set; }
+        private EditPermission PermissionsSelf { get; }
+        public EditPermission Permissions => GetPermissions();
 
-        public ApiItem(IApiItemContainer parent, EditPermission perms)
+        public ApiItem(EditPermission perms) : this(perms, null) { }
+        public ApiItem(EditPermission perms, IApiItemContainer? parent)
         {
+            PermissionsSelf = perms;
+            if (parent != null)
+            {
+                SetParent(parent);
+            }
+        }
+
+        public void SetParent(IApiItemContainer parent)
+        {
+            Resource = parent.Resource;
             Parent = parent;
-            Permissions = (Parent is IApiItem parentItem) ? parentItem.Permissions & perms : Permissions = perms;
+        }
+
+        private EditPermission GetPermissions()
+        {
+            if (Parent is IApiItem parentItem)
+            {
+                // Permissions can't be less restrictive than that of parent item
+                return parentItem.Permissions & PermissionsSelf;
+            }
+            else
+            {
+                return PermissionsSelf;
+            }
+        }
+
+        /// <summary>
+        /// Tests if the current item has the necessary permissions to execute a create / modify / delete action.
+        /// </summary>
+        /// <param name="required">The required permissions to check for.</param>
+        /// <exception cref="ApiItemMissingPermissionsException">When the current item does not have all of the required permissions.</exception>
+        public void CheckPermissions(EditPermission required)
+        {
+            EditPermission missing = EditPermission.None;
+            if (required.CanCreate() && !Permissions.CanCreate()) missing |= EditPermission.Create;
+            if (required.CanModify() && !Permissions.CanModify()) missing |= EditPermission.Modify;
+            if (required.CanDelete() && !Permissions.CanDelete()) missing |= EditPermission.Delete;
+            if (missing > EditPermission.None) throw new ApiItemMissingPermissionsException(this, missing);
         }
 
         public abstract IApiItem CreateCopy(IApiItemContainer container, EditPermission perms);
 
-        public abstract void UpdateFrom(IApiItem other);
+        public abstract void UpdateFrom(IApiItem other, bool checkPermissions);
 
         public abstract JToken ToJson();
 
@@ -40,72 +75,115 @@ namespace ApiFramework.Resources
 
         public ApiResponse ToResponse()
         {
-            return new ApiResponse(200, JsonConvert.SerializeObject(ToJson()));
+            return new ApiResponse(200, ToJsonString());
         }
 
         public override string ToString()
         {
-            return Parent.NameOf(this);
+            if (Parent != null && Parent.Contains(this))
+            {
+                if (Parent is ApiItem parentItem)
+                {
+                    return $"{Parent.ToString()}.{Parent.NameOf(this)}";
+                }
+                else
+                {
+                    return Parent.NameOf(this);
+                }
+            }
+
+            return $"<Unbound: {GetType().GetNiceTypeName()}>";
         }
 
-        public static IApiItem FromJson(IApiItemContainer parent, Func<string[], EditPermission> getPerms, string json)
+        public static IApiItem? FromJson(IApiItemContainer parent, string json, Dictionary<ApiPropertyPath, ApiPropertyInfo> propertyInfos) => FromJson(parent, JsonConvert.DeserializeObject<JToken>(json), propertyInfos, ApiPropertyPath.Root);
+        public static IApiItem? FromJson(IApiItemContainer parent, JToken token, Dictionary<ApiPropertyPath, ApiPropertyInfo> propertyInfos) => FromJson(parent, token, propertyInfos, ApiPropertyPath.Root);
+        internal static IApiItem? FromJson(IApiItemContainer? parent, JToken? token, Dictionary<ApiPropertyPath, ApiPropertyInfo>? propertyInfos, ApiPropertyPath? currentPath)
         {
-            JToken? rootToken = (JToken?) JsonConvert.DeserializeObject(json);
-            if (rootToken == null) throw new ApiJsonParsingException("Deserialized JSON object is null");
-            
-            return FromJson(parent, getPerms, rootToken);
-        }
+            if (parent == null) throw new ArgumentNullException(nameof(parent));
+            if (token == null) throw new ArgumentNullException(nameof(token));
+            if (propertyInfos == null) throw new ArgumentNullException(nameof(propertyInfos));
+            if (currentPath == null) throw new ArgumentNullException(nameof (currentPath));
 
-        public static IApiItem FromJson(IApiItemContainer parent, Func<string[], EditPermission> getPerms, JToken token)
-        {
-            return FromJson(parent, getPerms, token, new string[]{ });
-        }
+            if (!propertyInfos.ContainsKey(currentPath)) return null; // Skip any tokens that aren't defined in propertyInfos
+            ApiPropertyInfo propertyInfo = propertyInfos[currentPath];
 
-        internal static IApiItem FromJson(IApiItemContainer parent, Func<string[], EditPermission> getPerms, JToken token, string[] itemPath)
-        {
             JTokenType tokenType = token.Type;
             switch (tokenType)
             {
                 case JTokenType.Object:
-                    ApiItemDict dict = new ApiItemDict(parent, getPerms(itemPath));
+                    ApiItemDict dict = new ApiItemDict(propertyInfo.Permissions, parent);
                     foreach (KeyValuePair<string, JToken?> kv in (JObject) token)
                     {
                         if (kv.Value != null)
                         {
-                            dict.Insert(kv.Key, FromJson(dict, getPerms, kv.Value, itemPath.Append(kv.Key).ToArray()), false);
+                            IApiItem? item = FromJson(dict, kv.Value, propertyInfos, currentPath.Append(kv.Key));
+                            if (item != null) dict.Insert(kv.Key, item, false);
                         }
                     }
                     return dict;
 
                 case JTokenType.Array:
-                    ApiItemList list = new ApiItemList(parent, getPerms(itemPath));
+                    ApiItemList list = new ApiItemList(propertyInfo.Permissions, parent);
                     for (int i = 0; i < ((JArray) token).Count; i++)
                     {
                         JToken childToken = ((JArray) token)[i];
-                        list.Insert(FromJson(list, getPerms, childToken, itemPath.Append(i.ToString()).ToArray()), false);
+                        IApiItem? item = FromJson(list, childToken, propertyInfos, currentPath.Append(i.ToString()));
+                        if (item != null) list.Insert(item, false);
                     }
                     return list;
 
                 case JTokenType.Date:
-                    return new ApiItemValue<DateTime?>(parent, getPerms(itemPath), (DateTime?) ((JValue)token).Value);
+                    return new ApiItemValue<DateTime?>(propertyInfo.Permissions, parent, (DateTime?) ((JValue)token).Value);
 
                 case JTokenType.String:
-                    return new ApiItemValue<string?>(parent, getPerms(itemPath), (string?) ((JValue) token).Value);
+                    return new ApiItemValue<string?>(propertyInfo.Permissions, parent, (string?) ((JValue) token).Value);
 
                 case JTokenType.Integer:
-                    return new ApiItemValue<long?>(parent, getPerms(itemPath), (long?) ((JValue) token).Value);
+                    return new ApiItemValue<long?>(propertyInfo.Permissions, parent, (long?) ((JValue) token).Value);
 
                 case JTokenType.Float:
-                    return new ApiItemValue<float?>(parent, getPerms(itemPath), (float?)((JValue) token).Value);
+                    return new ApiItemValue<float?>(propertyInfo.Permissions, parent, (float?)((JValue) token).Value);
 
                 case JTokenType.Boolean:
-                    return new ApiItemValue<bool?>(parent, getPerms(itemPath), (bool?)((JValue) token).Value);
+                    return new ApiItemValue<bool?>(propertyInfo.Permissions, parent, (bool?)((JValue) token).Value);
 
                 case JTokenType.Null:
-                    return new ApiItemValue<object?>(parent, getPerms(itemPath), null);
+                    return new ApiItemValue<object?>(propertyInfo.Permissions, parent, null);
 
                 default:
                     throw new ApiJsonParsingException($"Unsupported token type: {tokenType}");
+            }
+        }
+
+        public static IApiItem CreateNewForProperty(IApiItemContainer parent, ApiPropertyInfo propertyInfo)
+        {
+            if (typeof(ApiItemDict).IsAssignableFrom(propertyInfo.TargetType))
+            {
+                // New ApiItemDict
+                return new ApiItemDict(propertyInfo.Permissions, parent);
+            }
+            else if (typeof(ApiItemList).IsAssignableFrom(propertyInfo.TargetType))
+            {
+                // New ApiItemList
+                return new ApiItemList(propertyInfo.Permissions, parent);
+            }
+            else if (propertyInfo.TargetType.IsGenericType && propertyInfo.TargetType.GetGenericTypeDefinition() == typeof(ApiItemValue<>))
+            {
+                // New ApiItemValue
+                Type valueType = propertyInfo.TargetType.GenericTypeArguments[0];
+                if (valueType.IsValueType)
+                {
+                    return (IApiItem)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, Activator.CreateInstance(valueType));
+                }
+                else
+                {
+                    return (IApiItem)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, null);
+                }
+            }
+            else
+            {
+                // Can't create instance
+                throw new ArgumentException($"Can't create new ApiItem instance for type {propertyInfo.TargetType}!");
             }
         }
     }
