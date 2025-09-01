@@ -1,5 +1,4 @@
-﻿using ApiFramework.Enums;
-using ApiFramework.Exceptions;
+﻿using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -10,51 +9,39 @@ namespace ApiFramework.Resources
 {
     public abstract class ApiResource : IApiResource, IApiItemContainer
     {
-        private static Dictionary<Type, Dictionary<ApiPropertyPath, ApiPropertyInfo>> _propertyInfosCache = new();
-        public Dictionary<ApiPropertyPath, ApiPropertyInfo> PropertyInfos => GetOrInitializePropertyInfos();
         public string ResourceName => GetType().Name;
-        public IApiResource Resource => this;
+        public ApiPropertyInfo RootPropertyInfo { get; }
         public IApiItem RootItem { get; }
+
 
         public ApiResource() : this(null, null) { }
         public ApiResource(string json) : this(JsonConvert.DeserializeObject<JToken>(json)) { }
         public ApiResource(JToken? json) : this(null, json) { }
         public ApiResource(IApiItem? rootItem, JToken? json)
         {
+            RootPropertyInfo = new ApiPropertyInfo(this, ApiPropertyPath.Root, typeof(ApiItemDict), Enums.EditPermission.CreateModifyDelete);
             if (json != null)
             {
-                RootItem = ApiItem.FromJson(this, json, PropertyInfos) ?? throw new ApiJsonParsingException($"Null item after parsing JSON to create {GetType().Name}.");
+                RootItem = ApiItem.FromJson(RootPropertyInfo, this, json) ?? throw new ApiJsonParsingException($"Null item after parsing JSON to create {GetType().Name}.");
             }
             else
             {
-                RootItem = rootItem ?? new ApiItemDict(EditPermission.CreateModifyDelete, this);
+                RootItem = rootItem ?? new ApiItemDict(RootPropertyInfo, this);
             }
         }
 
-        private Dictionary<ApiPropertyPath, ApiPropertyInfo> GetOrInitializePropertyInfos()
+        public ApiPropertyInfo this[ApiPropertyPath path]
         {
-            if (_propertyInfosCache.ContainsKey(GetType()))
-                return _propertyInfosCache[GetType()];
-
-            // First call, initialize property infos for resource type
-            Dictionary<ApiPropertyPath, ApiPropertyInfo> propertyInfos = new()
+            get
             {
-                { ApiPropertyPath.Root, new ApiPropertyInfo(this, ApiPropertyPath.Root, typeof(ApiItemDict), Enums.EditPermission.CreateModifyDelete) } // Implicit root property
-            };
-
-            List<ApiPropertyInfo> propertyInfoList = new(GetPropertyInfos());
-            propertyInfoList.Sort(); // Sorts by length of segments first)
-            foreach (ApiPropertyInfo propertyInfo in propertyInfoList)
-            {
-                if (propertyInfo.Path == ApiPropertyPath.Root) continue; // Can't override implicit root
-                propertyInfos[propertyInfo.Path] = propertyInfo;
+                if (path == ApiPropertyPath.Root) return RootPropertyInfo;
+                return GetPropertyInfo(path);
             }
-
-            _propertyInfosCache.Add(GetType(), propertyInfos);
-            return propertyInfos;
         }
 
-        protected abstract ApiPropertyInfo[] GetPropertyInfos();
+        protected abstract ApiPropertyInfo GetPropertyInfo(ApiPropertyPath path);
+
+        protected abstract bool HasPropertyInfo(ApiPropertyPath path);
 
         public void UpdateFrom(ApiResource other)
         {
@@ -129,8 +116,8 @@ namespace ApiFramework.Resources
                 if (currentItem is ApiItemDict itemDict)
                 {
                     currentPath = currentPath.Append(pathSegment);
-                    if (!PropertyInfos.ContainsKey(currentPath)) throw new ApiInvalidPropertyException(GetType(), currentPath);
-                    ApiPropertyInfo currentPropertyInfo = PropertyInfos[currentPath];
+                    if (!HasPropertyInfo(currentPath)) throw new ApiInvalidPropertyException(GetType(), currentPath);
+                    ApiPropertyInfo currentPropertyInfo = GetPropertyInfo(currentPath);
 
                     if (itemDict.ContainsKey(pathSegment))
                     {
@@ -143,7 +130,7 @@ namespace ApiFramework.Resources
                     {
                         // Item doesn't exist yet -> Attempt to create & insert (will throw exception if permissions are missing)
                         IApiItem newItem = ApiItem.CreateNewForProperty(itemDict, currentPropertyInfo);
-                        itemDict.Insert(pathSegment, newItem, true);
+                        itemDict.InsertNew<IApiItem>(pathSegment, newItem, true);
                         currentItem = newItem;
                         if (isLast) break;
                         continue;

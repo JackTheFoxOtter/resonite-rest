@@ -25,6 +25,20 @@ namespace ApiFramework.Resources
             Permissions = perms;
         }
 
+        /// <summary>
+        /// Tests if the current item has the necessary permissions to execute a create / modify / delete action.
+        /// </summary>
+        /// <param name="required">The required permissions to check for.</param>
+        /// <exception cref="ApiResourceMissingPermissionsException">When the current item does not have all of the required permissions.</exception>
+        public void CheckPermissions(EditPermission required)
+        {
+            EditPermission missing = EditPermission.None;
+            if (required.CanCreate() && !Permissions.CanCreate()) missing |= EditPermission.Create;
+            if (required.CanModify() && !Permissions.CanModify()) missing |= EditPermission.Modify;
+            if (required.CanDelete() && !Permissions.CanDelete()) missing |= EditPermission.Delete;
+            if (missing > EditPermission.None) throw new ApiPropertyMissingPermissionsException(this, missing);
+        }
+
         public int CompareTo(ApiPropertyInfo other)
         {
             return Path.CompareTo(other.Path);

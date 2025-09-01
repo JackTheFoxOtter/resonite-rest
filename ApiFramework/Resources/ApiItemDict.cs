@@ -12,8 +12,7 @@ namespace ApiFramework.Resources
         private Dictionary<string, IApiItem> ItemMapping { get; } = new();
         private Dictionary<IApiItem, string> ItemReverseMapping { get; } = new();
 
-        public ApiItemDict(EditPermission perms) : base(perms) { }
-        public ApiItemDict(EditPermission perms, IApiItemContainer? parent) : base(perms, parent) { }
+        public ApiItemDict(ApiPropertyInfo propertyInfo, IApiItemContainer parent) : base(propertyInfo, parent) { }
 
         public int Count()
         {
@@ -37,22 +36,68 @@ namespace ApiFramework.Resources
             return ItemReverseMapping[item];
         }
 
-        public void Insert(string key, IApiItem item) => Insert(key, item, true);
-        public void Insert(string key, IApiItem item, bool checkPermission)
+        public IApiItem this[string key]
         {
-            if (ContainsKey(key)) throw new ArgumentException($"ApiItemDict already contains an item with key {key}");
-            if (Contains(item)) throw new ArgumentException($"ApiItemDict already contains item {item}");
-            if (checkPermission) CheckPermissions(EditPermission.Modify);
+            get
+            {
+                if (!ContainsKey(key)) throw new ArgumentException($"ApiItemDict doesn't contain an item with key {key}");
 
-            ItemMapping.Add(key, item);
-            ItemReverseMapping.Add(item, key);
-            item.SetParent(this);
+                return ItemMapping[key];
+            }
+            set
+            {
+                if (!ContainsKey(key)) throw new ArgumentException($"ApiItemDict doesn't contain an item with key {key}");
+
+                ItemMapping[key] = value;
+            }
+        }
+
+        public T? Get<T>(string key) where T : IApiItem
+        {
+            IApiItem item = this[key];
+            return (item is T tItem) ? tItem : default;
+        }
+
+        public T InsertNew<T>(string key, ApiPropertyInfo itemPropertyInfo) => InsertNew<T>(key, itemPropertyInfo, true);
+        public T InsertNew<T>(string key, ApiPropertyInfo itemPropertyInfo, bool checkPermissions)
+        {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
+            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
+            if (ContainsKey(key)) throw new ArgumentException($"ApiItemDict already contains an item with key {key}");
+            if (checkPermissions)
+            {
+                PropertyInfo.CheckPermissions(EditPermission.Modify);
+                itemPropertyInfo.CheckPermissions(EditPermission.Create);
+            }
+
+            IApiItem newItem = (IApiItem)Activator.CreateInstance(itemPropertyInfo.TargetType, itemPropertyInfo, this);
+            ItemMapping.Add(key, newItem);
+            ItemReverseMapping.Add(newItem, key);
+
+            return (T)newItem;
+        }
+
+        public T InsertCopy<T>(string key, ApiPropertyInfo itemPropertyInfo, T sourceItem) where T : IApiItem => InsertCopy<T>(key, itemPropertyInfo, sourceItem, true);
+        public T InsertCopy<T>(string key, ApiPropertyInfo itemPropertyInfo, T sourceItem, bool checkPermissions) where T : IApiItem
+        {
+            if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
+            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
+            if (ContainsKey(key)) throw new ArgumentException($"ApiItemDict already contains an item with key {key}");
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
+
+            IApiItem newItem = sourceItem.CopyTo(itemPropertyInfo, this, checkPermissions);
+            ItemMapping.Add(key, newItem);
+            ItemReverseMapping.Add(newItem, key);
+
+            return (T)newItem;
         }
 
         public void Remove(string key) => Remove(key, true);
-        public void Remove(string key, bool checkCanModify)
+        public void Remove(string key, bool checkPermissions)
         {
-            if (checkCanModify) CheckPermissions(EditPermission.Modify);
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
 
             if (ContainsKey(key))
             {
@@ -62,22 +107,12 @@ namespace ApiFramework.Resources
         }
 
         public void Clear() => Clear(true);
-        public void Clear(bool checkCanModify)
+        public void Clear(bool checkPermissions)
         {
-            if (checkCanModify) CheckPermissions(EditPermission.Modify);
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
 
             ItemReverseMapping.Clear();
             ItemMapping.Clear();
-        }
-
-        public IApiItem this[string key]
-        {
-            get
-            {
-                if (!ContainsKey(key)) throw new ArgumentException($"ApiItemDict doesn't contain an item with key {key}");
-
-                return ItemMapping[key];
-            }
         }
 
         public override JToken ToJson()
@@ -90,14 +125,16 @@ namespace ApiFramework.Resources
             return jsonObj;
         }
 
-        public override IApiItem CreateCopy(IApiItemContainer container, EditPermission perms)
+        public override IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions)
         {
-            if (container == null) throw new ArgumentNullException(nameof(container));
+            if (newPropertyInfo == null) throw new ArgumentNullException(nameof(newPropertyInfo));
+            if (newParent == null) throw new ArgumentNullException(nameof(newParent));
 
-            ApiItemDict newDict = new ApiItemDict(perms, container);
+            ApiItemDict newDict = new ApiItemDict(newPropertyInfo, newParent);
             foreach (KeyValuePair<string, IApiItem> kv in ItemMapping)
             {
-                newDict.Insert(kv.Key, kv.Value.CreateCopy(newDict, kv.Value.Permissions));
+                ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[newPropertyInfo.Path.Append(kv.Key)];
+                newDict.InsertCopy(kv.Key, childPropertyInfo, kv.Value, checkPermissions);
             }
             return newDict;
         }
@@ -105,29 +142,22 @@ namespace ApiFramework.Resources
         public override void UpdateFrom(IApiItem other, bool checkPermissions)
         {
             if (other == null) throw new ArgumentNullException(nameof(other));
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            if (other is not ApiItemDict otherDict) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
 
-            if (other is ApiItemDict otherDict)
+            foreach (KeyValuePair<string, IApiItem> kv in otherDict)
             {
-                foreach (KeyValuePair<string, IApiItem> kv in otherDict)
+                if (ContainsKey(kv.Key))
                 {
-                    string key = kv.Key;
-                    IApiItem item = kv.Value;
-                    if (ContainsKey(key))
-                    {
-                        // Update existing item
-                        this[key].UpdateFrom(item, false); // Permissions already checked above
-                    }
-                    else
-                    {
-                        // Insert new item
-                        Insert(key, item.CreateCopy(this, item.Permissions));
-                    }
+                    // Update existing item
+                    this[kv.Key].UpdateFrom(kv.Value, false); // Permissions already checked above
                 }
-            }
-            else
-            {
-                throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+                else
+                {
+                    // Insert new item
+                    ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[PropertyInfo.Path.Append(kv.Key)];
+                    InsertCopy(kv.Key, childPropertyInfo, kv.Value, checkPermissions);
+                }
             }
         }
 

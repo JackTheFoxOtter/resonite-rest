@@ -1,5 +1,6 @@
 ﻿using ApiFramework;
 using ApiFramework.Enums;
+using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
 using ApiFramework.Resources;
 using ExampleApi.Resources;
@@ -49,24 +50,64 @@ namespace ExampleApi
             return success;
         }
 
-        public async Task<bool> TestCreateResource()
+        /// <summary>
+        /// Testing API Item stuff.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<bool> TestItems()
         {
-            ExampleResource resource = new ExampleResource();
-            Logger.Log($"Created resource {resource}:");
-            foreach (KeyValuePair<ApiPropertyPath, ApiPropertyInfo> info in resource.PropertyInfos)
-            {
-                ApiPropertyPath path = info.Key;
-                ApiPropertyInfo property = info.Value;
 
-                Logger.Log($" -> {path}: Type: {property.TargetType.GetNiceTypeName()}, Perms: {property.Permissions.ToFriendlyName()}");
-            }
-            Logger.Log($"Resource JSON: {resource.ToJsonString()}");
-            Logger.Log($"Test writing description (should work)");
-            resource.Description.Value = "Test Description";
-            Logger.Log($"Resource JSON: {resource.ToJsonString()}");
-
-            return true;
         }
+
+        //public async Task<bool> TestCreateResource()
+        //{
+        //    ExampleResource resource = new ExampleResource();
+        //    Logger.Log($"Created resource {resource}:");
+        //    foreach (KeyValuePair<ApiPropertyPath, ApiPropertyInfo> info in resource.PropertyInfos)
+        //    {
+        //        ApiPropertyPath path = info.Key;
+        //        ApiPropertyInfo property = info.Value;
+
+        //        Logger.Log($" -> {path}: Type: {property.TargetType.GetNiceTypeName()}, Perms: {property.Permissions.ToFriendlyName()}");
+        //    }
+        //    Logger.Log($"Resource JSON: {resource.ToJsonString()}");
+
+        //    // Test modifying a modifiable property
+        //    Logger.Log($"Test writing description... (should succeed, description has create & modify permission)");
+        //    string new_description = "Test Description";
+        //    resource.Description.Value = new_description; // Write to object
+        //    string? description = resource?.ToJson()?["description"]?.Value<string>();
+        //    if (description != new_description)
+        //    {
+        //        Logger.Log($"Failed! Description was '{description}', expected: '{new_description}'");
+        //        return false;
+        //    }
+
+        //    // Test modifying a read-only property (expect failure)
+        //    Logger.Log($"Test writing id... (should fail, id is read-only)");
+        //    try
+        //    {
+        //        resource.ID.Value = Guid.NewGuid().ToString();
+        //        Logger.Log("Failed! Should have thrown exception on write.");
+        //        return false;
+
+        //    } catch(ApiResourceMissingPermissionsException ex) { }
+
+        //    // TODO:
+        //    // Test inserting a property that doesn't have create permission (expect failure)
+        //    Logger.Log($"Test creating an object... (should fail, object only has modify permission, but cannot be created)");
+        //    try
+        //    {
+        //        ApiItemDict obj = resource.Object;
+        //        ApiItemValue<string> objectText = obj.Get<ApiItemValue<string>>("text");
+        //        ApiItemValue<int> objInt = obj.Get<ApiItemValue<int>>("number");
+
+
+        //    } catch(ApiResourceMissingPermissionsException ex) { }
+
+
+        //    return true;
+        //}
 
         /// <summary>
         /// Tests a full round-trip of an ExampleResource loaded from a JSON string.

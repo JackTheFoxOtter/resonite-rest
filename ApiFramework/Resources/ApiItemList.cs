@@ -12,8 +12,7 @@ namespace ApiFramework.Resources
     {
         private List<IApiItem> Items { get; } = new();
 
-        public ApiItemList(EditPermission perms) : base(perms) { }
-        public ApiItemList(EditPermission perms, IApiItemContainer? parent) : base(perms, parent) { }
+        public ApiItemList(ApiPropertyInfo propertyInfo, IApiItemContainer parent) : base(propertyInfo, parent) { }
 
         public int Count()
         {
@@ -29,7 +28,7 @@ namespace ApiFramework.Resources
         {
             if (!Contains(item)) throw new ArgumentException($"ApiItemList doesn't contain item {item}");
 
-            return $"{Parent.NameOf(this)}.{IndexOf(item)}";
+            return IndexOf(item).ToString();
         }
 
         public int IndexOf(IApiItem item)
@@ -39,27 +38,57 @@ namespace ApiFramework.Resources
             return Items.IndexOf(item);
         }
 
-        public void Insert(IApiItem item) => Insert(item, true);
-        public void Insert(IApiItem item, bool checkPermissions)
+        public IApiItem this[int index]
         {
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            get
+            {
+                if (index < 0 || index >= Items.Count) throw new IndexOutOfRangeException("index");
 
-            Items.Add(item);
-            item.SetParent(this);
+                return Items[index];
+            }
         }
 
-        public void InsertValue<T>(T value, EditPermission perms) => InsertValue(value, perms, true);
-        public void InsertValue<T>(T value, EditPermission perms, bool checkPermissions)
+        public T? Get<T>(int index) where T : IApiItem
         {
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            IApiItem item = this[index];
+            return (item is T tItem) ? tItem : default;
+        }
 
-            Insert(new ApiItemValue<T>(perms, this, value));
+        public T InsertNew<T>(ApiPropertyInfo itemPropertyInfo) where T : IApiItem => InsertNew<T>(itemPropertyInfo, true);
+        public T InsertNew<T>(ApiPropertyInfo itemPropertyInfo, bool checkPermissions) where T : IApiItem
+        {
+            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
+            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
+            if (checkPermissions)
+            {
+                PropertyInfo.CheckPermissions(EditPermission.Modify);
+                itemPropertyInfo.CheckPermissions(EditPermission.Create);
+            }
+
+            IApiItem newItem = (IApiItem)Activator.CreateInstance(itemPropertyInfo.TargetType, itemPropertyInfo, this);
+            Items.Add(newItem);
+
+            return (T)newItem;
+        }
+
+        public T InsertCopy<T>(ApiPropertyInfo itemPropertyInfo, T sourceItem) where T : IApiItem => InsertCopy<T>(itemPropertyInfo, sourceItem, true);
+        public T InsertCopy<T>(ApiPropertyInfo itemPropertyInfo, T sourceItem, bool checkPermissions) where T : IApiItem
+        {
+            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
+            if (sourceItem == null) throw new ArgumentNullException(nameof(sourceItem));
+            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
+
+            IApiItem newItem = sourceItem.CopyTo(itemPropertyInfo, this, checkPermissions);
+            Items.Add(newItem);
+
+            return (T)newItem;
         }
 
         public void Remove(IApiItem item) => Remove(item, true);
         public void Remove(IApiItem item, bool checkPermissions)
         {
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
 
             Items.Remove(item);
         }
@@ -67,19 +96,9 @@ namespace ApiFramework.Resources
         public void Clear() => Clear(true); 
         public void Clear(bool checkPermissions)
         {
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
 
             Items.Clear();
-        }
-
-        public IApiItem this[int index]
-        {
-            get
-            {
-                if (index >= Items.Count) throw new IndexOutOfRangeException("index");
-
-                return Items[index];
-            }
         }
 
         public override JToken ToJson()
@@ -87,15 +106,17 @@ namespace ApiFramework.Resources
             return new JArray(Items.Select((item) => { return item.ToJson(); }));
         }
 
-        public override IApiItem CreateCopy(IApiItemContainer container, EditPermission perms)
+        public override IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions)
         {
-            if (container == null) throw new ArgumentNullException(nameof(container));
+            if (newPropertyInfo == null) throw new ArgumentNullException(nameof(newPropertyInfo));
+            if (newParent == null) throw new ArgumentNullException(nameof(newParent));
+            if (checkPermissions) newPropertyInfo.CheckPermissions(EditPermission.Create);
 
-            ApiItemList newList = new ApiItemList(perms, container);
+            ApiItemList newList = new ApiItemList(newPropertyInfo, newParent);
+            ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[newPropertyInfo.Path.Append("#")];
             foreach (IApiItem item in Items)
             {
-                IApiItem newItem = item.CreateCopy(newList, perms);
-                newList.Insert(newItem);
+                newList.InsertCopy(childPropertyInfo, item, checkPermissions);
             }
             return newList;
         }
@@ -104,13 +125,13 @@ namespace ApiFramework.Resources
         {
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (other is not ApiItemList otherList) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
-            if (checkPermissions) CheckPermissions(EditPermission.Modify);
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
             
-            Clear();
+            ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[PropertyInfo.Path.Append("#")];
+            Clear(false);
             foreach (IApiItem item in otherList)
             {
-                IApiItem newItem = item.CreateCopy(this, item.Permissions);
-                Insert(newItem);
+                InsertCopy(childPropertyInfo, item, checkPermissions);
             }
         }
 

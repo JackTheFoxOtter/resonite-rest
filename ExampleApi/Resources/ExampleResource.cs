@@ -14,7 +14,7 @@ namespace ExampleApi.Resources
         public ApiItemValue<string> Description => GetOrCreateProperty<ApiItemValue<string>>("description", true);
         public ApiItemValue<int> ListCount => GetOrCreateProperty<ApiItemValue<int>>("listCount", true);
         public ApiItemList List => GetOrCreateProperty<ApiItemList>("list", true);
-        public ApiItemDict Dict => GetOrCreateProperty<ApiItemDict>("object", true);
+        public ApiItemDict Object => GetOrCreateProperty<ApiItemDict>("object", true);
 
         public ExampleResource() : base() { }
         public ExampleResource(string json) : base(json) { }

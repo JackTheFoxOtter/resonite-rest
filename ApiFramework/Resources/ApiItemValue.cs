@@ -12,17 +12,15 @@ namespace ApiFramework.Resources
         public T? Value
         {
             get => _value;
-            set
-            {
-                CheckPermissions(EditPermission.Modify);
-                _value = value;
-            }
+            set => SetValue(value, true);
         }
 
-        public ApiItemValue(EditPermission perms, T? value) : base(perms) { }
-        public ApiItemValue(EditPermission perms, IApiItemContainer parent, T? value) : base(perms, parent)
+        public ApiItemValue(ApiPropertyInfo propertyInfo, IApiItemContainer parent) : base(propertyInfo, parent) { }
+
+        public void SetValue(T? newValue, bool checkPermissions)
         {
-            _value = value;
+            if(checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
+            _value = newValue;
         }
 
         public override JToken ToJson()
@@ -30,27 +28,30 @@ namespace ApiFramework.Resources
             return new JValue(Value);
         }
 
-        public override IApiItem CreateCopy(IApiItemContainer container, EditPermission perms)
+        public override IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions)
         {
-            if (container == null) throw new ArgumentNullException(nameof(container));
+            if (newParent == null) throw new ArgumentNullException(nameof(newParent));
+            if (newPropertyInfo == null) throw new ArgumentNullException(nameof(newPropertyInfo));
 
+            ApiItemValue<T> newItem = new(newPropertyInfo, newParent);
             if (typeof(T).IsValueType)
             {
                 // Value type -> pass by value
-                return new ApiItemValue<T>(perms, container, Value);
+                newItem.SetValue(Value, checkPermissions);
             }
             else
             {
                 // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                return new ApiItemValue<T>(perms, container, JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)));
+                newItem.SetValue(JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)), checkPermissions);
             }
+            return newItem;
         }
 
         public override void UpdateFrom(IApiItem other, bool checkPermissions)
         {
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (other is not ApiItemValue<T> otherValue) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
-            if (checkPermissions) CheckPermissions(EditPermission.Modify); 
+            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify); 
 
             if (typeof(T).IsValueType)
             {
