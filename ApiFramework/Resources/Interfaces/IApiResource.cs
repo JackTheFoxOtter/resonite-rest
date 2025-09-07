@@ -2,13 +2,12 @@
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 
-namespace ApiFramework.Interfaces
+namespace ApiFramework.Resources
 {
     public interface IApiResource
     {
         public string ResourceName { get; }
-        public Dictionary<ApiPropertyPath, ApiPropertyInfo> PropertyInfos { get; }
-        public IApiItem RootItem { get; }
+        public IApiProperty RootProperty { get; }
         public void UpdateFrom(ApiResource other);
         public JToken ToJson();
         public string ToJsonString();
