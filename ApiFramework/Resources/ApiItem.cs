@@ -1,9 +1,8 @@
-﻿using ApiFramework.Enums;
-using ApiFramework.Interfaces;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using ApiFramework.Exceptions;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace ApiFramework.Resources
 {
@@ -13,34 +12,25 @@ namespace ApiFramework.Resources
     /// </summary>
     public abstract class ApiItem : IApiItem
     {
-        public ApiPropertyInfo PropertyInfo { get; private set; }
-        public IApiItemContainer Parent { get; private set; }
+        public IApiItemContainer? Parent { get; private set; }
 
-        public ApiItem(ApiPropertyInfo propertyInfo, IApiItemContainer parent)
+        public void SetParent(IApiItemContainer? newParent)
         {
-            PropertyInfo = propertyInfo;
-            Parent = parent;
+            if (Parent == newParent) return;
+
+            Parent?.RemoveItem(this);
+            Parent = newParent;
         }
 
-        public IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent) => CopyTo(newPropertyInfo, newParent, true);
+        public ApiItem() { }
 
-        public abstract IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions);
+        public ApiItem(IApiItemContainer? parent) { SetParent(parent); }
 
-        public void UpdateFrom(IApiItem other) => UpdateFrom(other, true);
+        public abstract void UpdateFrom(IApiItem other);
 
-        public abstract void UpdateFrom(IApiItem other, bool checkPermissions);
+        public abstract IApiItem CreateCopy();
 
-        public abstract JToken ToJson();
-
-        public string ToJsonString()
-        {
-            return JsonConvert.SerializeObject(ToJson());
-        }
-
-        public ApiResponse ToResponse()
-        {
-            return new ApiResponse(200, ToJsonString());
-        }
+        public abstract JsonNode ToJson();
 
         public override string ToString()
         {
@@ -59,99 +49,93 @@ namespace ApiFramework.Resources
             return $"<Unbound: {GetType().GetNiceTypeName()}>";
         }
 
-        public static IApiItem? FromJson(ApiPropertyInfo propertyInfo, IApiItemContainer parent, string json) => FromJson(propertyInfo, parent, JsonConvert.DeserializeObject<JToken>(json), ApiPropertyPath.Root);
-        public static IApiItem? FromJson(ApiPropertyInfo propertyInfo, IApiItemContainer parent, JToken token) => FromJson(propertyInfo, parent, token, ApiPropertyPath.Root);
-        internal static IApiItem? FromJson(ApiPropertyInfo propertyInfo, IApiItemContainer parent, JToken token, ApiPropertyPath currentPath)
+        public static IApiItem FromJson(IApiItemContainer? parent, string json) => FromJson(parent, JsonSerializer.Deserialize<JsonNode>(json));
+
+        public static IApiItem FromJson(IApiItemContainer? parent, JsonNode jsonNode)
         {
-            if (propertyInfo == null) throw new ArgumentNullException(nameof(propertyInfo));
-            if (parent == null) throw new ArgumentNullException(nameof(parent));
-            if (token == null) throw new ArgumentNullException(nameof(token));
-            if (currentPath == null) throw new ArgumentNullException(nameof(currentPath));
+            ArgumentNullException.ThrowIfNull(jsonNode);
 
-            //if (!propertyInfos.ContainsKey(currentPath)) return null; // Skip any tokens that aren't defined in propertyInfos
-            //ApiPropertyInfo propertyInfo = propertyInfos[currentPath];
-
-            JTokenType tokenType = token.Type;
-            switch (tokenType)
+            JsonValueKind valueKind = jsonNode.GetValueKind();
+            switch (valueKind)
             {
-                case JTokenType.Object:
-                    ApiItemDict dict = new ApiItemDict(propertyInfo, parent);
-                    foreach (KeyValuePair<string, JToken?> kv in (JObject)token)
+                case JsonValueKind.Object:
+                    JsonObject jsonObj = jsonNode.AsObject();
+                    ApiItemDict dict = new ApiItemDict(parent);
+                    foreach (KeyValuePair<string, JsonNode?> kv in jsonObj)
                     {
-                        if (kv.Value != null)
-                        {
-                            ApiPropertyInfo itemPropertyInfo = propertyInfo.Resource.PropertyInfos[propertyInfo.Path.Append(kv.Key)];
-                            IApiItem newItem = dict.InsertNew<IApiItem>(kv.Key, itemPropertyInfo, false);
+                        if (string.IsNullOrEmpty(kv.Key)) continue;
+                        if (kv.Value == null) continue;
 
-                            IApiItem? item = FromJson(dict, kv.Value, propertyInfos, currentPath.Append(kv.Key));
-                        }
+                        dict.Insert(kv.Key, FromJson(dict, kv.Value));
                     }
                     return dict;
 
-                case JTokenType.Array:
-                    ApiItemList list = new ApiItemList(propertyInfo, parent);
-                    for (int i = 0; i < ((JArray)token).Count; i++)
+                case JsonValueKind.Array:
+                    JsonArray jsonArr = jsonNode.AsArray();
+                    ApiItemList list = new ApiItemList(parent);
+                    foreach (JsonNode? childNode in jsonArr)
                     {
-                        JToken childToken = ((JArray)token)[i];
-                        IApiItem? item = FromJson(list, childToken, propertyInfos, currentPath.Append(i.ToString()));
-                        if (item != null) list.Insert(item, false);
+                        if (childNode == null) continue;
+
+                        list.Insert(FromJson(list, childNode));
                     }
                     return list;
 
-                case JTokenType.Date:
-                    ApiItemValue<DateTime?> newDateItem = new ApiItemValue<DateTime?>(propertyInfo, parent);
-                    newDateItem.SetValue()
-                    return (DateTime?)((JValue)token).Value);
+                case JsonValueKind.String:
+                    JsonValue jsonString = jsonNode.AsValue();
+                    if (jsonString.TryGetValue(out DateTime dateTime))
+                    {
+                        return new ApiItemValue<DateTime>(parent, dateTime);
+                    }
+                    return new ApiItemObject<string>(parent, jsonString.GetValue<string>());
 
-                case JTokenType.String:
-                    return new ApiItemValue<string?>(propertyInfo, parent, (string?)((JValue)token).Value);
+                case JsonValueKind.Number:
+                    JsonValue jsonNumber = jsonNode.AsValue();
+                    return new ApiItemValue<double>(parent, jsonNumber.GetValue<double>());
 
-                case JTokenType.Integer:
-                    return new ApiItemValue<long?>(propertyInfo, parent, (long?)((JValue)token).Value);
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    JsonValue jsonBoolean = jsonNode.AsValue();
+                    return new ApiItemValue<bool>(parent, jsonBoolean.GetValue<bool>());
 
-                case JTokenType.Float:
-                    return new ApiItemValue<float?>(propertyInfo, parent, (float?)((JValue)token).Value);
-
-                case JTokenType.Boolean:
-                    return new ApiItemValue<bool?>(propertyInfo, parent, (bool?)((JValue)token).Value);
-
-                case JTokenType.Null:
-                    return new ApiItemValue<object?>(propertyInfo, parent, null);
+                case JsonValueKind.Null:
+                    return new ApiItemObject<object>(parent, null);
 
                 default:
-                    throw new ApiJsonParsingException($"Unsupported token type: {tokenType}");
+                    throw new ApiJsonParsingException($"Unsupported JSON value kind: {valueKind}");
             }
         }
 
-        public static T CreateNewForProperty<T>(IApiItemContainer? parent, ApiPropertyInfo propertyInfo, bool checkPermissions) where T : ApiItem
-        {
-            if (checkPermissions) propertyInfo.CheckPermissions(EditPermission.Create);
-            if (!typeof(T).IsAssignableFrom(propertyInfo.TargetType)) 
-                throw new ArgumentException($"Property type {propertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
+        // TODO: This belongs into Property
+        //public static T CreateNewForProperty<T>(IApiItemContainer? parent, ApiPropertyInfo propertyInfo, bool checkPermissions) where T : ApiItem
+        //{
+        //    if (checkPermissions) propertyInfo.CheckPermissions(EditPermission.Create);
+        //    if (!typeof(T).IsAssignableFrom(propertyInfo.TargetType)) 
+        //        throw new ArgumentException($"Property type {propertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
 
-            if (typeof(ApiItemDict).IsAssignableFrom(propertyInfo.TargetType) || typeof(ApiItemList).IsAssignableFrom(propertyInfo.TargetType))
-            {
-                // New ApiItemDict or ApiItemList
-                return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent);
-            }
-            else if (propertyInfo.TargetType.IsGenericType && propertyInfo.TargetType.GetGenericTypeDefinition() == typeof(ApiItemValue<>))
-            {
-                // New ApiItemValue
-                Type valueType = propertyInfo.TargetType.GenericTypeArguments[0];
-                if (valueType.IsValueType)
-                {
-                    return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, Activator.CreateInstance(valueType));
-                }
-                else
-                {
-                    return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, null);
-                }
-            }
-            else
-            {
-                // Can't create instance
-                throw new ArgumentException($"Can't create new ApiItem instance for type {propertyInfo.TargetType}!");
-            }
-        }
+        //    if (typeof(ApiItemDict).IsAssignableFrom(propertyInfo.TargetType) || typeof(ApiItemList).IsAssignableFrom(propertyInfo.TargetType))
+        //    {
+        //        // New ApiItemDict or ApiItemList
+        //        return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent);
+        //    }
+        //    else if (propertyInfo.TargetType.IsGenericType && propertyInfo.TargetType.GetGenericTypeDefinition() == typeof(ApiItemValue<>))
+        //    {
+        //        // New ApiItemValue
+        //        Type valueType = propertyInfo.TargetType.GenericTypeArguments[0];
+        //        if (valueType.IsValueType)
+        //        {
+        //            return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, Activator.CreateInstance(valueType));
+        //        }
+        //        else
+        //        {
+        //            return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, null);
+        //        }
+        //    }
+        //    else
+        //    {
+        //        // Can't create instance
+        //        throw new ArgumentException($"Can't create new ApiItem instance for type {propertyInfo.TargetType}!");
+        //    }
+        //}
     }
 }

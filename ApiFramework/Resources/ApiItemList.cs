@@ -1,10 +1,8 @@
-﻿using ApiFramework.Enums;
-using ApiFramework.Interfaces;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 
 namespace ApiFramework.Resources
 {
@@ -12,7 +10,9 @@ namespace ApiFramework.Resources
     {
         private List<IApiItem> Items { get; } = new();
 
-        public ApiItemList(ApiPropertyInfo propertyInfo, IApiItemContainer parent) : base(propertyInfo, parent) { }
+        public ApiItemList() { }
+
+        public ApiItemList(IApiItemContainer? parent) : base(parent) { }
 
         public int Count()
         {
@@ -29,6 +29,11 @@ namespace ApiFramework.Resources
             if (!Contains(item)) throw new ArgumentException($"ApiItemList doesn't contain item {item}");
 
             return IndexOf(item).ToString();
+        }
+
+        public void RemoveItem(IApiItem item)
+        {
+            Items.Remove(item);
         }
 
         public int IndexOf(IApiItem item)
@@ -54,85 +59,67 @@ namespace ApiFramework.Resources
             return (item is T tItem) ? tItem : default;
         }
 
-        public T InsertNew<T>(ApiPropertyInfo itemPropertyInfo) where T : IApiItem => InsertNew<T>(itemPropertyInfo, true);
-        public T InsertNew<T>(ApiPropertyInfo itemPropertyInfo, bool checkPermissions) where T : IApiItem
+        public void Insert(IApiItem item)
         {
-            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
-            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
-            if (checkPermissions)
-            {
-                PropertyInfo.CheckPermissions(EditPermission.Modify);
-                itemPropertyInfo.CheckPermissions(EditPermission.Create);
-            }
-
-            IApiItem newItem = (IApiItem)Activator.CreateInstance(itemPropertyInfo.TargetType, itemPropertyInfo, this);
-            Items.Add(newItem);
-
-            return (T)newItem;
+            Items.Add(item);
+            item.SetParent(this);
         }
 
-        public T InsertCopy<T>(ApiPropertyInfo itemPropertyInfo, T sourceItem) where T : IApiItem => InsertCopy<T>(itemPropertyInfo, sourceItem, true);
-        public T InsertCopy<T>(ApiPropertyInfo itemPropertyInfo, T sourceItem, bool checkPermissions) where T : IApiItem
+        public T InsertNew<T>() where T : IApiItem, new()
         {
-            if (itemPropertyInfo == null) throw new ArgumentNullException(nameof(itemPropertyInfo));
+            T newItem = Activator.CreateInstance<T>();
+            newItem.SetParent(this);
+            Items.Add(newItem);
+            return newItem;
+        }
+
+        public T InsertCopy<T>(T sourceItem) where T : IApiItem
+        {
             if (sourceItem == null) throw new ArgumentNullException(nameof(sourceItem));
-            if (!typeof(T).IsAssignableFrom(itemPropertyInfo.TargetType)) throw new ArgumentException($"Property type {itemPropertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
-            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
-
-            IApiItem newItem = sourceItem.CopyTo(itemPropertyInfo, this, checkPermissions);
-            Items.Add(newItem);
-
-            return (T)newItem;
+            
+            T copiedItem = (T)sourceItem.CreateCopy();
+            copiedItem.SetParent(this);
+            Items.Add(copiedItem);
+            return copiedItem;
         }
 
-        public void Remove(IApiItem item) => Remove(item, true);
-        public void Remove(IApiItem item, bool checkPermissions)
+        public void RemoveAt(int index)
         {
-            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
+            if (index < 0 || index >= Items.Count) throw new IndexOutOfRangeException("index");
 
-            Items.Remove(item);
+            Items.RemoveAt(index);
         }
 
-        public void Clear() => Clear(true); 
-        public void Clear(bool checkPermissions)
+        public void Clear()
         {
-            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
-
             Items.Clear();
         }
 
-        public override JToken ToJson()
+        public override JsonNode ToJson()
         {
-            return new JArray(Items.Select((item) => { return item.ToJson(); }));
+            return new JsonArray(Items.Select((item) => { return item.ToJson(); }).ToArray());
         }
 
-        public override IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions)
-        {
-            if (newPropertyInfo == null) throw new ArgumentNullException(nameof(newPropertyInfo));
-            if (newParent == null) throw new ArgumentNullException(nameof(newParent));
-            if (checkPermissions) newPropertyInfo.CheckPermissions(EditPermission.Create);
-
-            ApiItemList newList = new ApiItemList(newPropertyInfo, newParent);
-            ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[newPropertyInfo.Path.Append("#")];
-            foreach (IApiItem item in Items)
-            {
-                newList.InsertCopy(childPropertyInfo, item, checkPermissions);
-            }
-            return newList;
-        }
-
-        public override void UpdateFrom(IApiItem other, bool checkPermissions)
+        public override void UpdateFrom(IApiItem other)
         {
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (other is not ApiItemList otherList) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
-            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
-            
-            ApiPropertyInfo childPropertyInfo = PropertyInfo.Resource.PropertyInfos[PropertyInfo.Path.Append("#")];
-            Clear(false);
+
+            Clear();
             foreach (IApiItem item in otherList)
             {
-                InsertCopy(childPropertyInfo, item, checkPermissions);
+                InsertCopy(item);
             }
+        }
+
+        public override IApiItem CreateCopy()
+        {
+            ApiItemList copy = new ApiItemList();
+            foreach (IApiItem item in Items)
+            {
+                copy.InsertCopy(item);
+            }
+            return copy;
         }
 
         public IEnumerator<IApiItem> GetEnumerator()

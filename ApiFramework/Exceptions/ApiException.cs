@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
+using System.Text.Json;
 
 namespace ApiFramework.Exceptions
 {
@@ -30,7 +30,7 @@ namespace ApiFramework.Exceptions
 
         public ApiResponse ToResponse()
         {
-            return new ApiResponse(_statusCode, JsonConvert.SerializeObject(ToString()));
+            return new ApiResponse(_statusCode, JsonSerializer.Serialize(ToString()));
         }
     }
 }

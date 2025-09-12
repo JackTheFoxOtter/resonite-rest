@@ -1,68 +1,45 @@
-﻿using ApiFramework.Enums;
-using ApiFramework.Interfaces;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using ApiFramework.Exceptions;
 using System;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace ApiFramework.Resources
 {
-    public class ApiItemValue<T> : ApiItem
+    public class ApiItemValue<T> : ApiItem where T : struct
     {
         private T? _value;
         public T? Value
         {
             get => _value;
-            set => SetValue(value, true);
+            set => _value = value;
         }
 
-        public ApiItemValue(ApiPropertyInfo propertyInfo, IApiItemContainer parent) : base(propertyInfo, parent) { }
+        public ApiItemValue() : base() { }
 
-        public void SetValue(T? newValue, bool checkPermissions)
+        public ApiItemValue(IApiItemContainer? parent) : base(parent) { }
+
+        public ApiItemValue(IApiItemContainer? parent, T? value) : base(parent) { _value = value; }
+
+        public override JsonNode ToJson()
         {
-            if(checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify);
-            _value = newValue;
+            return JsonSerializer.SerializeToNode(Value) ?? throw new ApiJsonParsingException("Failed to serialize ApiItemValue to JSON-Node!");
         }
 
-        public override JToken ToJson()
+        public override void UpdateFrom(IApiItem other)
         {
-            return new JValue(Value);
+            ArgumentNullException.ThrowIfNull(other);
+            if (other is not ApiItemValue<T> otherItem) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
+
+            // Value type -> pass by value
+            Value = otherItem.Value;
         }
 
-        public override IApiItem CopyTo(ApiPropertyInfo newPropertyInfo, IApiItemContainer newParent, bool checkPermissions)
+        public override IApiItem CreateCopy()
         {
-            if (newParent == null) throw new ArgumentNullException(nameof(newParent));
-            if (newPropertyInfo == null) throw new ArgumentNullException(nameof(newPropertyInfo));
-
-            ApiItemValue<T> newItem = new(newPropertyInfo, newParent);
-            if (typeof(T).IsValueType)
-            {
-                // Value type -> pass by value
-                newItem.SetValue(Value, checkPermissions);
-            }
-            else
-            {
-                // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                newItem.SetValue(JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(Value)), checkPermissions);
-            }
-            return newItem;
-        }
-
-        public override void UpdateFrom(IApiItem other, bool checkPermissions)
-        {
-            if (other == null) throw new ArgumentNullException(nameof(other));
-            if (other is not ApiItemValue<T> otherValue) throw new ArgumentException($"Can't update {GetType()} from item of different type {other.GetType()}");
-            if (checkPermissions) PropertyInfo.CheckPermissions(EditPermission.Modify); 
-
-            if (typeof(T).IsValueType)
-            {
-                // Value type -> pass by value
-                Value = otherValue.Value;
-            }
-            else
-            {
-                // Reference type -> pass by reference, so create copy through serializing / deseraializing
-                Value = JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(otherValue.Value));
-            }
+            ApiItemValue<T> copy = new();
+            // Value type -> pass by value
+            copy.Value = Value;
+            return copy;
         }
     }
 }

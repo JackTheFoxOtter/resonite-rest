@@ -1,10 +1,10 @@
 ﻿using ApiFramework.Exceptions;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -31,9 +31,9 @@ namespace ApiFramework
 
                 try
                 {
-                    paramValue = JsonConvert.DeserializeObject<T>(paramValueJson);
+                    paramValue = JsonSerializer.Deserialize<T>(paramValueJson);
                 }
-                catch (JsonReaderException ex)
+                catch (JsonException ex)
                 {
                     throw new ApiJsonParsingException($"Failed to parse query parameter '{paramName}'. (Expected JSON-formatted {typeof(T)} value)");
                 }

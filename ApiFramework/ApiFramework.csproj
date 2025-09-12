@@ -21,10 +21,32 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>$(ResonitePath)\Newtonsoft.Json.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <Compile Remove="ApiEndpoint.cs" />
+    <Compile Remove="ApiRequest.cs" />
+    <Compile Remove="ApiServer.cs" />
+    <Compile Remove="Exceptions\ApiForbiddenUserAgentException.cs" />
+    <Compile Remove="Exceptions\ApiInvalidItemTypeException.cs" />
+    <Compile Remove="Exceptions\ApiInvalidPropertyException.cs" />
+    <Compile Remove="Exceptions\ApiInvalidRequestBodyException.cs" />
+    <Compile Remove="Exceptions\ApiMethodNotmplementedException.cs" />
+    <Compile Remove="Exceptions\ApiMissingQueryParameterException.cs" />
+    <Compile Remove="Exceptions\ApiMissingRequestBodyException.cs" />
+    <Compile Remove="Exceptions\ApiMissingRequiredArgumentException.cs" />
+    <Compile Remove="Exceptions\ApiPropertyAlreadyExistsException.cs" />
+    <Compile Remove="Exceptions\ApiPropertyNotCreatedException.cs" />
+    <Compile Remove="Exceptions\ApiResourceItemNotFoundException.cs" />
+    <Compile Remove="Exceptions\ApiResourceMissingPermissionsException.cs" />
+    <Compile Remove="Exceptions\ApiResourceNotCreatedException.cs" />
+    <Compile Remove="Exceptions\ApiResourceNotDeletedException.cs" />
+    <Compile Remove="Exceptions\ApiResourceNotFoundException.cs" />
+    <Compile Remove="Exceptions\ApiResourceNotUpdatedException.cs" />
+    <Compile Remove="Resources\ApiPropertyInfo.cs" />
+    <Compile Remove="Resources\ApiResource.cs" />
+    <Compile Remove="Resources\ApiResourceEnumerable.cs" />
+    <Compile Remove="Resources\ApiResourceManager.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.Web" />
   </ItemGroup>
 
