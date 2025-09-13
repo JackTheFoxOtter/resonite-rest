@@ -3,15 +3,26 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text.Json.Nodes;
 
-namespace ApiFramework.Resources
+namespace ApiFramework.Resources.Items
 {
+    /// <summary>
+    /// API Item to represent a key-value pair of items.
+    /// Item keys are always strings.
+    /// </summary>
     public class ApiItemDict : ApiItem, IApiItemContainer, IEnumerable<KeyValuePair<string, IApiItem>>
     {
         private Dictionary<string, IApiItem> ItemMapping { get; } = new();
         private Dictionary<IApiItem, string> ItemReverseMapping { get; } = new();
 
+        /// <summary>
+        /// Creates a new ApiItemDict instance.
+        /// </summary>
         public ApiItemDict() : base() { }
 
+        /// <summary>
+        /// Creates a new ApiItemDict instance.
+        /// </summary>
+        /// <param name="parent">The container to assign the item to.</param>
         public ApiItemDict(IApiItemContainer? parent) : base(parent) { }
 
         public int Count()
@@ -30,7 +41,7 @@ namespace ApiFramework.Resources
 
             return ItemReverseMapping[item];
         }
-
+        
         public void RemoveItem(IApiItem item)
         {
             if (Contains(item))
@@ -40,11 +51,22 @@ namespace ApiFramework.Resources
             }
         }
 
+        /// <summary>
+        /// Checks whether this dictionary contains an item with a specific key.
+        /// </summary>
+        /// <param name="key">The key to check for.</param>
+        /// <returns>True if the key is contained in the dictionary.</returns>
         public bool ContainsKey(string key)
         {
             return ItemMapping.ContainsKey(key);
         }
 
+        /// <summary>
+        /// Retrieves an item at a key in this dictionary.
+        /// </summary>
+        /// <param name="key">Key of the item to retrieve.</param>
+        /// <returns>The item with the specified key.</returns>
+        /// <exception cref="IndexOutOfRangeException"></exception>
         public IApiItem this[string key]
         {
             get
@@ -61,12 +83,25 @@ namespace ApiFramework.Resources
             }
         }
 
+        /// <summary>
+        /// Retrieves an item at a key in this dictionary.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to retrieve.</typeparam>
+        /// <param name="key">Key of the item to retrieve.</param>
+        /// <returns>The item with the specified key.</returns>
         public T? Get<T>(string key) where T : IApiItem
         {
             IApiItem item = this[key];
-            return (item is T tItem) ? tItem : default;
+            return item is T tItem ? tItem : default;
         }
 
+        /// <summary>
+        /// Inserts an item into the dictionary.
+        /// </summary>
+        /// <param name="key">The key to add the item with.</param>
+        /// <param name="item">The item to add.</param>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
         public void Insert(string key, IApiItem item)
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
@@ -76,7 +111,15 @@ namespace ApiFramework.Resources
             ItemReverseMapping.Add(item, key);
             item.SetParent(this);
         }
-        
+
+        /// <summary>
+        /// Creates a new item and inserts it into this dictionary.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to create.</typeparam>
+        /// <param name="key">The key to add the item with.</param>
+        /// <returns>The newly created item.</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
         public T InsertNew<T>(string key) where T : IApiItem, new()
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
@@ -89,6 +132,16 @@ namespace ApiFramework.Resources
             return newItem;
         }
 
+        /// <summary>
+        /// Creates a copy of an item and inserts it into this dictionary.
+        /// The source item remains unchanged.
+        /// </summary>
+        /// <typeparam name="T">The type of the item to duplicate.</typeparam>
+        /// <param name="key">The key to add the item with.</param>
+        /// <param name="sourceItem">The item to duplicate.</param>
+        /// <returns>The newly created item.</returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        /// <exception cref="ArgumentException"></exception>
         public T InsertCopy<T>(string key, T sourceItem) where T : IApiItem
         {
             if (string.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
@@ -101,6 +154,11 @@ namespace ApiFramework.Resources
             return copiedItem;
         }
 
+        /// <summary>
+        /// Removes an item at a key from this dictionary.
+        /// </summary>
+        /// <param name="key">Key of the item to remove.</param>
+        /// <exception cref="IndexOutOfRangeException"></exception>
         public void Remove(string key)
         {
             if (ContainsKey(key))
@@ -110,6 +168,9 @@ namespace ApiFramework.Resources
             }
         }
 
+        /// <summary>
+        /// Clears this dictionary of all items.
+        /// </summary>
         public void Clear()
         {
             ItemReverseMapping.Clear();

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ApiFramework.Resources
+namespace ApiFramework.Resources.Properties
 {
     /// <summary>
     /// Represents the "path" to an API item inside of a resource.

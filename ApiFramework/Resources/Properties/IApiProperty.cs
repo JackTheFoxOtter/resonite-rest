@@ -1,6 +1,7 @@
 using ApiFramework.Enums;
+using ApiFramework.Resources.Items;
 
-namespace ApiFramework.Resources
+namespace ApiFramework.Resources.Properties
 {
     /// <summary>
     /// API Properties are API Items that are associated with a defined structure.
