@@ -1,49 +1,55 @@
 ﻿using ApiFramework.Exceptions;
 using ApiFramework.Interfaces;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using ApiFramework.Resources.Items;
+using ApiFramework.Resources.Properties;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 
 namespace ApiFramework.Resources
 {
     public abstract class ApiResource : IApiResource, IApiItemContainer
     {
         public string ResourceName => GetType().Name;
-        public ApiPropertyInfo RootPropertyInfo { get; }
-        public IApiItem RootItem { get; }
-
+        public IApiProperty RootProperty { get; }
 
         public ApiResource() : this(null, null) { }
-        public ApiResource(string json) : this(JsonConvert.DeserializeObject<JToken>(json)) { }
-        public ApiResource(JToken? json) : this(null, json) { }
-        public ApiResource(IApiItem? rootItem, JToken? json)
+        public ApiResource(string json) : this(JsonSerializer.Deserialize<JsonNode>(json)) { }
+        public ApiResource(JsonNode? json) : this(null, json) { }
+        public ApiResource(ApiItemDict? rootItem) : this(rootItem, null) { }
+        private ApiResource(ApiItemDict? rootItem, JsonNode? json)
         {
-            RootPropertyInfo = new ApiPropertyInfo(this, ApiPropertyPath.Root, typeof(ApiItemDict), Enums.EditPermission.CreateModifyDelete);
-            if (json != null)
+            if (rootItem != null)
             {
-                RootItem = ApiItem.FromJson(RootPropertyInfo, this, json) ?? throw new ApiJsonParsingException($"Null item after parsing JSON to create {GetType().Name}.");
+                // Ensure item is parented
+                rootItem.Parent?.RemoveItem(rootItem);
+                rootItem.SetParent(this);
             }
-            else
+            else if (json != null)
             {
-                RootItem = rootItem ?? new ApiItemDict(RootPropertyInfo, this);
+                // Initialization item from JSON
+                // TODO: This doesn't work! This would only create one property for complex structures.
+                IApiItem jsonItem = ApiItem.FromJson(this, json);
+                if (jsonItem is not ApiItemDict) throw new ApiJsonParsingException($"Root property of resource must be ApiItemDict, JSON parsed to {jsonItem?.GetType()?.GetNiceTypeName()} instead.");
+                rootItem = (ApiItemDict)jsonItem;
             }
+
+            rootItem ??= new();
+            RootProperty = new ApiProperty(ApiPropertyPath.Root, rootItem, Enums.EditPermission.Modify);
         }
 
-        public ApiPropertyInfo this[ApiPropertyPath path]
+        public IApiProperty this[ApiPropertyPath path]
         {
             get
             {
-                if (path == ApiPropertyPath.Root) return RootPropertyInfo;
-                return GetPropertyInfo(path);
+                if (path == ApiPropertyPath.Root) return RootProperty;
+                return GetProperty(path);
             }
         }
 
-        protected abstract ApiPropertyInfo GetPropertyInfo(ApiPropertyPath path);
-
-        protected abstract bool HasPropertyInfo(ApiPropertyPath path);
-
-        public void UpdateFrom(ApiResource other)
+        public void UpdateFrom(IApiResource other)
         {
             if (other == null) throw new ArgumentNullException(nameof(other));
             if (GetType() != other.GetType()) throw new ArgumentException($"Can't update {GetType()} from resource with different type ({other.GetType()})");
@@ -184,24 +190,29 @@ namespace ApiFramework.Resources
             throw new NotImplementedException();
         }
 
-        public JToken ToJson()
+        public JsonNode ToJson()
         {
-            return RootItem.ToJson();
+            return RootProperty.Item.ToJson();
         }
 
         public string ToJsonString()
         {
-            return RootItem.ToJsonString();
+            return RootProperty.Item.ToJsonString();
         }
 
         public ApiResponse ToResponse()
         {
-            return RootItem.ToResponse();
+            return RootProperty.Item.ToResponse();
         }
 
         public override string ToString()
         {
             return ResourceName;
+        }
+
+        public void RemoveItem(IApiItem item)
+        {
+            throw new ApiItemContainerRemoveException(this, item, "Cannot remove resource root property!");
         }
     }
 }

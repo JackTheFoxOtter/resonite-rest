@@ -1,19 +1,20 @@
 ﻿using ApiFramework.Resources;
+using ApiFramework.Resources.Properties;
 
 namespace ApiFramework.Exceptions
 {
     internal class ApiPropertyAlreadyExistsException : ApiException
     {
-        public ApiPropertyInfo PropertyInfo { get; }
+        public ApiProperty Property { get; }
 
-        public ApiPropertyAlreadyExistsException(ApiPropertyInfo propertyInfo) : base(400) 
+        public ApiPropertyAlreadyExistsException(ApiProperty property) : base(400) 
         {
-            PropertyInfo = propertyInfo;
+            Property = property;
         }
 
         public override string ToString()
         {
-            return $"Property {PropertyInfo.Path} already exists!";
+            return $"Property {Property.Path} already exists!";
         }
     }
 }

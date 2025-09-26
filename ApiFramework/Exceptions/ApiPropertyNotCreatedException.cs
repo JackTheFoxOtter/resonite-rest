@@ -1,12 +1,13 @@
 ﻿using ApiFramework.Resources;
+using ApiFramework.Resources.Properties;
 
 namespace ApiFramework.Exceptions
 {
     internal class ApiPropertyNotCreatedException : ApiException
     {
-        ApiPropertyPath Path { get; }
+        ApiProperty Path { get; }
         
-        public ApiPropertyNotCreatedException(ApiPropertyPath path) : base(400) 
+        public ApiPropertyNotCreatedException(ApiProperty path) : base(400)
         {
             Path = path;
         }

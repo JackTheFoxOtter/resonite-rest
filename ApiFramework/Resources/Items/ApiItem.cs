@@ -17,7 +17,7 @@ namespace ApiFramework.Resources.Items
         public IApiItemContainer? Parent { get; private set; }
 
         /// <summary>
-        /// Creates a new instance of the API item. 
+        /// Creates a new instance of the API item.
         /// </summary>
         public ApiItem() { }
 
@@ -45,9 +45,9 @@ namespace ApiFramework.Resources.Items
         {
             if (Parent != null && Parent.Contains(this))
             {
-                if (Parent is ApiItem parentItem)
+                if (Parent is ApiItem)
                 {
-                    return $"{Parent.ToString()}.{Parent.NameOf(this)}";
+                    return $"{Parent}.{Parent.NameOf(this)}";
                 }
                 else
                 {
@@ -127,37 +127,5 @@ namespace ApiFramework.Resources.Items
                     throw new ApiJsonParsingException($"Unsupported JSON value kind: {valueKind}");
             }
         }
-
-        // TODO: This belongs into Property
-        //public static T CreateNewForProperty<T>(IApiItemContainer? parent, ApiPropertyInfo propertyInfo, bool checkPermissions) where T : ApiItem
-        //{
-        //    if (checkPermissions) propertyInfo.CheckPermissions(EditPermission.Create);
-        //    if (!typeof(T).IsAssignableFrom(propertyInfo.TargetType)) 
-        //        throw new ArgumentException($"Property type {propertyInfo.TargetType.GetNiceTypeName()} is incompatible with generic argument type {typeof(T).GetNiceTypeName()}!");
-
-        //    if (typeof(ApiItemDict).IsAssignableFrom(propertyInfo.TargetType) || typeof(ApiItemList).IsAssignableFrom(propertyInfo.TargetType))
-        //    {
-        //        // New ApiItemDict or ApiItemList
-        //        return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent);
-        //    }
-        //    else if (propertyInfo.TargetType.IsGenericType && propertyInfo.TargetType.GetGenericTypeDefinition() == typeof(ApiItemValue<>))
-        //    {
-        //        // New ApiItemValue
-        //        Type valueType = propertyInfo.TargetType.GenericTypeArguments[0];
-        //        if (valueType.IsValueType)
-        //        {
-        //            return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, Activator.CreateInstance(valueType));
-        //        }
-        //        else
-        //        {
-        //            return (T)Activator.CreateInstance(propertyInfo.TargetType, propertyInfo.Permissions, parent, null);
-        //        }
-        //    }
-        //    else
-        //    {
-        //        // Can't create instance
-        //        throw new ArgumentException($"Can't create new ApiItem instance for type {propertyInfo.TargetType}!");
-        //    }
-        //}
     }
 }

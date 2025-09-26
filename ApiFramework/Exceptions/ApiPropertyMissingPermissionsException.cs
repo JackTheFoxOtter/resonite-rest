@@ -1,22 +1,23 @@
 ﻿using ApiFramework.Enums;
 using ApiFramework.Resources;
+using ApiFramework.Resources.Properties;
 
 namespace ApiFramework.Exceptions
 {
     public class ApiPropertyMissingPermissionsException : ApiException
     {
-        public ApiPropertyInfo PropertyInfo { get; }
+        public ApiProperty Property { get; }
         public EditPermission MissingPermissions { get; }
 
-        public ApiPropertyMissingPermissionsException(ApiPropertyInfo propertyInfo, EditPermission missingPermissions) : base(403)
+        public ApiPropertyMissingPermissionsException(ApiProperty property, EditPermission missingPermissions) : base(403)
         {
-            PropertyInfo = propertyInfo;
+            Property = property;
             MissingPermissions = missingPermissions;
         }
 
         public override string ToString()
         {
-            return $"{PropertyInfo.ToString()} is missing the following permission(s): {MissingPermissions.ToFriendlyName()}";
+            return $"{Property.ToString()} is missing the following permission(s): {MissingPermissions.ToFriendlyName()}";
         }
     }
 }

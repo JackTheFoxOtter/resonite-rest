@@ -3,11 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResoniteApi", "ResoniteApi.csproj", "{4E96109F-B22E-4BA3-854F-30A5902B499C}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiFramework", "..\ApiFramework\ApiFramework.csproj", "{339F70A4-FE54-47A1-8719-4012FC0A7BFC}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExampleApi", "..\ExampleApi\ExampleApi.csproj", "{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ApiFrameworkTests", "..\ApiFrameworkTests\ApiFrameworkTests.csproj", "{303AFD31-F228-4554-BDCE-9383BA4CDED2}"
 EndProject
@@ -17,18 +13,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4E96109F-B22E-4BA3-854F-30A5902B499C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4E96109F-B22E-4BA3-854F-30A5902B499C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4E96109F-B22E-4BA3-854F-30A5902B499C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4E96109F-B22E-4BA3-854F-30A5902B499C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{339F70A4-FE54-47A1-8719-4012FC0A7BFC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CFF8C245-CB23-45FC-BC3B-10DA8A0193AA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{303AFD31-F228-4554-BDCE-9383BA4CDED2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{303AFD31-F228-4554-BDCE-9383BA4CDED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{303AFD31-F228-4554-BDCE-9383BA4CDED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
